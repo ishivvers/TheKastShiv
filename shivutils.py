@@ -21,12 +21,18 @@ Notes:
 # imports
 ######################################################################
 
+# installed
 import numpy as np
 import pyfits as pf
-import cosmics as cr
+from pidly import IDL
 from os import path, system
 from pyraf import iraf
-from types import ListType, StringType
+from dateutil import parser as date_parser
+import urllib
+
+# local
+import cosmics as cr
+import credentials
 
 ######################################################################
 # global variables
@@ -108,7 +114,9 @@ def head_update( images, keywords, values, comment=None ):
         hdu.writeto( image, clobber=True )
         hdu.close()
 
-############################################################################
+######################################################################
+# external commands
+######################################################################
 
 def run_cmd( cmd, ignore_errors=False ):
     """
@@ -118,6 +126,93 @@ def run_cmd( cmd, ignore_errors=False ):
     if not ignore_errors:
         if res != 0:
             raise StandardError( "Error ::: command failed ::: "+cmd )
+
+def start_idl( idlpath = '/usr/bin/idl' ):
+    """
+    start an interactive IDL session.
+    """
+    session = IDL( idlpath )
+    session.interact()
+    session.close()
+
+def get_kast_data( datestring, outfile=None, unpack=True,
+                   un=credentials.repository_un, pw=credentials.repository_pw ):
+    """
+    Download kast data from a date (in the datestring).
+    """
+    if outfile == None:
+        outfile = datestring+'.alldata.tgz'
+    date = date_parser.parse(datestring)
+    print 'downloading data from %s-%s-%s (Y-M-D)' %(date.year, date.month, date.day)
+    cmd = 'wget --no-check-certificate --http-user="%s" --http-passwd="%s" '+\
+            '-O %s "https://mthamilton.ucolick.org/data/%s-%s/%s/shane/?tarball=true&allfiles=true"' \
+            %(un, pw, outfile, date.year, date.month, date.day))
+    run_cmd(cmd)
+    if unpack:
+        cmd = 'tar -xzvf %s' %outfile
+        run_cmd(cmd)
+
+def wiki2elog( datestring, runID, pagename=None, output=None,
+               un=credentials.wiki_un, pw=credentials.wiki_pw ):
+    """
+    Download and parse the log from the wiki page.  Stolen heavily
+     from K.Clubb's "wiki2elog.py" (thanks Kelsey!)
+    - datestring: a parsable string representing the recorded log's date
+    - runID: the alphabetical id for the run
+    - pagename: if given, will override the constructed page name and downloading
+      the wiki page given
+    - output: the output file; runID.log if not given
+    """
+    # construct the pagename and credentials request
+    if pagename == None:
+        date = date_parser.parse(datestring)
+        pagename = "%.2d_%.2d_kast_%s" %(date.month, date.day, runID)
+    creds = urllib.urlencode({"u" : un, "p" : pw})
+    # define lists to hold observation data
+    obs= []
+    side = []
+    group = []
+    types = []
+    # open the Night Summary page for the run
+    page = urllib.urlopen("http://hercules.berkeley.edu/wiki/doku.php?id="+pagename,data)
+    lines = page.readlines()
+    page.close()
+
+    # go through the HTML to find the beginning of the actual wiki page
+    line_num=0
+    while lines[line_num].strip()!='<!-- wikipage start -->':
+        line_num += 1 
+    line_num += 1
+    while lines[line_num].strip()=='':
+        line_num += 1
+    # if permission was denied, alert user and end program
+    if lines[line_num].find("Permission Denied")!=-1:
+        raise StandardError( 'Username/password combination invalid for the FlipperWiki!' )
+
+    # loop through the entire table (assuming that all of the observations are listed there)
+    while lines[line_num].strip()!='</table>':
+        # assume each table row tag is an image (or run of images)
+        if lines[line_num].find('</td>')!=-1:
+            # break line into each table entry
+            pieces = lines[line_num].split('</td>')
+            if pieces[2].strip().split('>')[1].strip()!='x':
+                # get Obs #
+                obs += [pieces[0].strip().split('>')[1].strip()]
+                # get Side
+                side += [pieces[2].strip().split('>')[1].strip()]
+                # get Group
+                group += [pieces[3].strip().split('>')[1].strip()]
+                # get Type
+                types += [pieces[4].strip().split('>')[1].strip()]
+        # go to next line
+        line_num += 1
+
+    # write all observations to file and close it
+    output = open(outfile,'w')
+    output.write('Obs     Side  Group  Type\n')
+    for n in range(len(obs)):
+        output.write(obs[n]+' '*(8-len(obs[n]))+side[n]+' '*(6-len(side[n]))+group[n]+' '*(7-len(group[n]))+types[n]+'\n')
+    output.close()
 
 ############################################################################
 # bias and flatfielding
@@ -178,6 +273,8 @@ def bias_correct(images, y1, y2, prefix=None):
         
         # add the dispersion axis keyword, saying the x axis is the wavelength axis
         head_update(outname, 'DISPAXIS', 1 )
+        # add a comment saying we performed a bias subtraction
+        head_update(outname, 'BIASSUB', True, comment='Bias subtracted with IDL kastbias.pro')
 
 ############################################################################
 
