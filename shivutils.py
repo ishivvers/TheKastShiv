@@ -15,6 +15,7 @@ Notes:
  - e.g.: mins = scipy.signal.argrelmin( fl, order=25 )
 
  - for now, use pIDLy with the IDL.interact() command to run cal.pro, etc
+ example: idl.pro("kastbias",'r6.fits',y1=46,y2=246)
 """
 
 ######################################################################
@@ -25,10 +26,10 @@ Notes:
 import numpy as np
 import pyfits as pf
 from pidly import IDL
-from os import path, system
 from pyraf import iraf
 from dateutil import parser as date_parser
 import urllib
+import os
 
 # local
 import cosmics as cr
@@ -59,9 +60,26 @@ yes=iraf.yes
 no=iraf.no
 INDEF=iraf.INDEF
 
-######################################################################
+############################################################################
+# file system management
+############################################################################
+
+def make_file_system( runID ):
+    """
+    Creates the file system heirarchy for kast reductions, with
+     the root location where the command was run from.
+    """
+    os.mkdir('uc')
+    os.chdir('uc')
+    os.mkdir('rawdata')
+    os.mkdir('working')
+    os.mkdir('final')
+    os.chdir('..')
+    
+
+############################################################################
 # fits file management
-######################################################################
+############################################################################
 
 def head_get( image, keywords ):
     '''
@@ -122,7 +140,7 @@ def run_cmd( cmd, ignore_errors=False ):
     """
     Wrapper for running external commands.
     """
-    res = system( cmd )
+    res = os.system( cmd )
     if not ignore_errors:
         if res != 0:
             raise StandardError( "Error ::: command failed ::: "+cmd )
@@ -215,7 +233,22 @@ def wiki2elog( datestring, runID, pagename=None, output=None,
     output.close()
 
 ############################################################################
-# bias and flatfielding
+# bias, flatfielding, header updates
+############################################################################
+
+def bias_correct_idl(images, y1, y2, prefix=None, idlpath = '/usr/bin/idl'):
+    """
+    Use pIDLy to interact with the trusty 'kastbias.pro' script
+     to bias correct a set of images with y trim limits of y1, y2.
+    NOTE: your IDL installation must know the location of 'kastbias.pro'
+    """
+    if prefix==None:
+        prefix = 'b'
+    idl = IDL( idlpath )
+    for image in images:
+        idl.pro("kastbias",image,y1=y1,y2=y2,prefix=prefix)
+    idl.close()
+
 ############################################################################
 
 def bias_correct(images, y1, y2, prefix=None):
@@ -250,7 +283,7 @@ def bias_correct(images, y1, y2, prefix=None):
         
         elif side == 'kastb':
             # need to process the two different blue amplifiers seperately
-            root,ext=path.splitext(image)
+            root,ext=os.path.splitext(image)
             iraf.ccdproc(image, output='%s_1'%root, ccdtype='', noproc=no, fixpix=no,
                          overscan=yes, trim=yes, zerocor=no, darkcor=no, flatcor=no,
                          illumcor=no, fringecor=no, readcor=no, scancor=no,
@@ -271,8 +304,6 @@ def bias_correct(images, y1, y2, prefix=None):
             head_update(outname, ['CCDSEC', 'DATASEC'],
                         ['[1:2048,1:%d]'%(y2-y1+1), '[1:2048,1:%d]'%(y2-y1+1)])
         
-        # add the dispersion axis keyword, saying the x axis is the wavelength axis
-        head_update(outname, 'DISPAXIS', 1 )
         # add a comment saying we performed a bias subtraction
         head_update(outname, 'BIASSUB', True, comment='Bias subtracted with IDL kastbias.pro')
 
@@ -296,6 +327,16 @@ def make_flat(images, outflat, gain=1.0, rdnoise=0.0, xwindow=50,
     # clip the result, so no values are beyond the clip limits
     iraf.imreplace(outflat, 1.0, lower=INDEF, upper=lowclip)
     iraf.imreplace(outflat, 1.0, lower=highclip, upper=INDEF)
+
+############################################################################
+
+def update_headers(images):
+    """
+    run uvfixhead (custom IRAF task) and calculate the airmass values
+    """
+    for image in images:
+        iraf.uvfixhead(image)
+        iraf.setairmass(image)
 
 ############################################################################
 
