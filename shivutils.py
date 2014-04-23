@@ -13,6 +13,8 @@ Notes:
     minima in the standard star spectra, afterwhich you can fit
     with spectools.
  - e.g.: mins = scipy.signal.argrelmin( fl, order=25 )
+
+ - for now, use pIDLy with the IDL.interact() command to run cal.pro, etc
 """
 
 ######################################################################
@@ -170,83 +172,12 @@ def bias_correct(images, y1, y2, prefix=None):
             run_cmd( 'mv j%s %s' % (image, outname) )
             
             # not sure if needed, but update the header info to reflect the new array size
+            print 'running maybe-useless task; CHECK ME OUT'
             head_update(outname, ['CCDSEC', 'DATASEC'],
                         ['[1:2048,1:%d]'%(y2-y1+1), '[1:2048,1:%d]'%(y2-y1+1)])
         
         # add the dispersion axis keyword, saying the x axis is the wavelength axis
         head_update(outname, 'DISPAXIS', 1 )
-    
-############################################################################    
-
-def redbias(images, prefix=None, biassec=REDBIAS, trimsec=REDTRIM):
-    '''
-    Subtract overscan and trim red frames
-    
-    If prefix is given, will add that prefix to every image before saving.
-     Otherwise, overwrites input file.'''
-    
-    if type(images) != list:
-        images = [images]
-    if prefix == None:
-        outputs = ["" for i in images]
-    else:
-        outputs = [prefix+i for i in images]
-    for i,image in enumerate(images):
-        iraf.ccdproc(image, output=outputs[i], ccdtype='', noproc=no, fixpix=no,
-                     overscan=yes,trim=yes, zerocor=no, darkcor=no, flatcor=no,
-                     illumcor=no, fringecor=no, readcor=no, scancor=no,
-                     biassec=biassec, trimsec=trimsec)
-        if prefix == None:
-            update_head(image, 'DISPAXIS', 1)
-        else:
-            update_head(outputs[i], 'DISPAXIS', 1)
-    return
-
-#############################################################################
-
-def bluebias(images, prefix=None, biassec1=BLUEBIAS1, trimsec1=BLUETRIM1, 
-             biassec2=BLUEBIAS2, trimsec2=BLUETRIM2, cleanup=True):
-
-    '''
-    Subtract overscan and trim blue frames.
-    Accounts for both amplifiers in the Kast blue side.
-    
-    If prefix is given, will add that prefix to every image before saving.
-     Otherwise, overwrites input file.
-    '''
-    
-    if type(images) != list:
-        images = [images]
-    if prefix == None:
-        outputs = ["" for i in images]
-    else:
-        outputs = [prefix+i for i in images]
- 
-    for i,image in enumerate(images):
-
-        root,ext=path.splitext(image)
-        iraf.ccdproc(image, output='%s_1' % root, ccdtype='', noproc=no, 
-                     fixpix=no, overscan=yes, trim=yes, zerocor=no, 
-                     darkcor=no, flatcor=no, illumcor=no, fringecor=no, 
-                     readcor=no, scancor=no, biassec=biassec1, 
-                     trimsec=trimsec1)
-        iraf.ccdproc(image, output='%s_2' % root, ccdtype='', noproc=no, 
-                     fixpix=no, overscan=yes, trim=yes, zerocor=no, 
-                     darkcor=no, flatcor=no, illumcor=no, fringecor=no, 
-                     readcor=no, scancor=no, biassec=biassec2, 
-                     trimsec=trimsec2)
-        iraf.imjoin('%s_1,%s_2' % (root, root), 'j%s' % image, 1)
-        if cleanup:
-            run_cmd( 'rm %s_1 %s_2' % (root, root) )
-        if prefix == None:
-            # replace input file
-            outname = image
-        else:
-            # create output file
-            outname = outputs[i]
-        run_cmd( 'mv j%s %s' % (image, outname) )
-        update_head(outname, 'DISPAXIS', 1)
-        update_head(outname, ['CCDSEC', 'DATASEC'], ['[1:2048,1:270]', '[1:2048,1:270]'])
 
 ############################################################################
 
