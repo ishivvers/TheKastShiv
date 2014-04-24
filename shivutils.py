@@ -27,9 +27,12 @@ import numpy as np
 import pyfits as pf
 from pidly import IDL
 from pyraf import iraf
+from glob import glob
+from scipy.optimize import minimize
 from dateutil import parser as date_parser
 import urllib
 import os
+import re
 
 # local
 import cosmics as cr
@@ -75,65 +78,58 @@ def make_file_system( runID ):
     os.mkdir('working')
     os.mkdir('final')
     os.chdir('..')
+
+def populate_working_dir( runID, logfile=None ):
+    """
+    Take the unpacked data from the raw directory, rename files as necessary,
+     and move them into the working directory.
+    Should be run from root directory, logfile should be wiki
+     e-log format, and logfile should reside in the root folder.
+     If logfile not given, assumes logfile=runID.log
+    """
+    if logfile == None:
+        logfile = runID+'.log'
+    
+    # parse the logfile
+    objects, flats, arcs = [],[],[]
+    lines = open(logfile, 'r').readlines()
+    for line in lines[1:]:  #first line should be a header
+        line = line.split()
+        which = line[-1]
+        side, group = map(int, line[1:3])
+        
+        # handle individual object numbers or ranges
+        if '-' in line[0]:
+            i,j = map(int, line[0].split('-'))
+            obs = range( i, j+1 )
+        else:
+            obs = [int(line[0])]
+        
+        if which == 'obj':
+            whichlist = objects
+        elif which == 'flat':
+            whichlist = flats
+        elif which == 'arc':
+            whichlist = arcs
+        else:
+            raise StandardError("error parsing %s"%logfile)
+        for ob in obs:
+            objects.append( [ob, side, group] )
+            
+    # copy over all relevant files to working directory and rename them
+    for o in objects+flats+arcs:
+        if o[1] == 'r':
+            run_cmd( 'cp rawdata/r%d.fits working/%sred%.2d.fits' %(o[0],runID,o[0]) )
+        elif o[1] == 'b':
+            run_cmd( 'cp rawdata/r%d.fits working/%sred%.2d.fits' %(o[0],runID,o[0]) )
+    
+    '''
+    TO DO: return objects that keep track of which arcs/flats/etc go with which object.
+    '''
     
 
-############################################################################
-# fits file management
-############################################################################
-
-def head_get( image, keywords ):
-    '''
-    Get given keywords from the given fits image.
-    '''
-    if type(keywords) != list:
-        keywords = [keywords]
-    hdu = pf.open(image)
-    values = []
-    for key in keywords:
-        values.append( hdu[0].header[key] )
-    hdu.close()
-    return values
-
-############################################################################
-
-def head_del( images, keywords ):
-    '''
-    Remove given keywords from fits images.
-    '''
-    if type(images) != list:
-        images = [images]
-    if type(keywords) != list:
-        keywords = [keywords]
-    for image in images:
-        hdu = pf.open(image)
-        for key in keywords:
-            hdu[0].remove(key)
-        hdu.writeto( image, clobber=True )
-        hdu.close()
-
-############################################################################
-
-def head_update( images, keywords, values, comment=None ):
-    '''
-    Update (or set) given keywords to given values for every image
-     in given images.
-    If comment is included, will add that comment to every updated keyword.
-    ''' 
-    if type(images) != list:
-        images = [images]
-    if type(keywords) != list:
-        keywords = [keywords]
-    if type(values) != list:
-        values = [values]
-    for image in images:
-        hdu = pf.open(image)
-        for i,key in enumerate(keywords):
-            hdu[0].header.set(key, values[i], comment)
-        hdu.writeto( image, clobber=True )
-        hdu.close()
-
 ######################################################################
-# external commands
+# external communications
 ######################################################################
 
 def run_cmd( cmd, ignore_errors=False ):
@@ -231,6 +227,61 @@ def wiki2elog( datestring, runID, pagename=None, output=None,
     for n in range(len(obs)):
         output.write(obs[n]+' '*(8-len(obs[n]))+side[n]+' '*(6-len(side[n]))+group[n]+' '*(7-len(group[n]))+types[n]+'\n')
     output.close()
+
+############################################################################
+# fits file management
+############################################################################
+
+def head_get( image, keywords ):
+    '''
+    Get given keywords from the given fits image.
+    '''
+    if type(keywords) != list:
+        keywords = [keywords]
+    hdu = pf.open(image)
+    values = []
+    for key in keywords:
+        values.append( hdu[0].header[key] )
+    hdu.close()
+    return values
+
+############################################################################
+
+def head_del( images, keywords ):
+    '''
+    Remove given keywords from fits images.
+    '''
+    if type(images) != list:
+        images = [images]
+    if type(keywords) != list:
+        keywords = [keywords]
+    for image in images:
+        hdu = pf.open(image)
+        for key in keywords:
+            hdu[0].remove(key)
+        hdu.writeto( image, clobber=True )
+        hdu.close()
+
+############################################################################
+
+def head_update( images, keywords, values, comment=None ):
+    '''
+    Update (or set) given keywords to given values for every image
+     in given images.
+    If comment is included, will add that comment to every updated keyword.
+    ''' 
+    if type(images) != list:
+        images = [images]
+    if type(keywords) != list:
+        keywords = [keywords]
+    if type(values) != list:
+        values = [values]
+    for image in images:
+        hdu = pf.open(image)
+        for i,key in enumerate(keywords):
+            hdu[0].header.set(key, values[i], comment)
+        hdu.writeto( image, clobber=True )
+        hdu.close()
 
 ############################################################################
 # bias, flatfielding, header updates
@@ -374,3 +425,66 @@ def clean_cosmics( fitspath, cleanpath, gain, rdnoise, maskpath=None ):
     if maskpath != None:
         cr.tofits(maskpath, c.mask, header)
     return
+
+######################################################################
+# automation tools
+######################################################################
+
+def tophat(x, low, high, left, right):
+    """
+    Returns a tophat with left, right for x-value edges, and
+     low,high for y-value limits
+    """
+    y = np.zeros_like(x)
+    y[ (x<=left) | (x>=right) ] = low
+    y[ (x>left) & (x<right) ] = high
+    return y
+
+def sumsqerr(p, x, y):
+    low, high, left, right = p
+    return np.sum( (y - tophat(x, low, high, left, right))**2 )
+    
+def find_trim_sec( flatfile, edgebuf=5, plot=True ):
+    """
+    Find the optimal y-axis trim values from flatfile.
+     edge: the size of the edge buffer in pixels
+    """
+    data = pf.open(flatfile)[0].data
+    # find the best column to examine by choosing the peak of
+    #  all averaged rows
+    icol = np.argmax( np.mean(data, 0) )
+    y = data[:,icol]
+    x = np.arange(len(data[:,icol]))
+    
+    p0 = [np.min(y), np.median(y), 10, len(x)-10]
+    res = minimize(sumsqerr, p0, args=(x,y), method='Nelder-Mead')
+    if not res.success:
+        raise StandardError("Cannot find good fit for trim section")
+    
+    y1 = res.x[2]+edgebuf
+    y2 = res.x[3]-edgebuf
+    
+    if plot:
+        # show the column we chose
+        plt.figure()
+        plt.plot( np.mean(data,0), 'k' )
+        ymin,ymax = plt.gca().get_ylim()
+        plt.vlines( [icol], ymin, ymax, color='r', lw=2 )
+        plt.ylabel('Row-averaged DN')
+        plt.xlabel('Column')
+        plt.title('Column used for trim selection')
+        
+        # show the best-fit trim section
+        plt.figure()
+        plt.plot(x,y,'k')
+        ymin,ymax = plt.gca().get_ylim()
+        plt.vlines( [y1,y2], ymin, ymax, color='r', lw=2 )
+        plt.ylabel('DN')
+        plt.xlabel('Row')
+        plt.title('Best-fit trim section')
+        plt.show()
+
+######################################################################
+    
+    
+    
