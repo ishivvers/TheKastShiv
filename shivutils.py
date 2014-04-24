@@ -155,6 +155,8 @@ def run_cmd( cmd, ignore_errors=False ):
         if res != 0:
             raise StandardError( "Error ::: command failed ::: "+cmd )
 
+############################################################################
+
 def start_idl( idlpath = '/usr/bin/idl' ):
     """
     start an interactive IDL session.
@@ -162,6 +164,8 @@ def start_idl( idlpath = '/usr/bin/idl' ):
     session = IDL( idlpath )
     session.interact()
     session.close()
+
+############################################################################
 
 def get_kast_data( datestring, outfile=None, unpack=True,
                    un=credentials.repository_un, pw=credentials.repository_pw ):
@@ -175,10 +179,13 @@ def get_kast_data( datestring, outfile=None, unpack=True,
     cmd = 'wget --no-check-certificate --http-user="%s" --http-passwd="%s" '+\
             '-O %s "https://mthamilton.ucolick.org/data/%s-%s/%s/shane/?tarball=true&allfiles=true"' \
             %(un, pw, outfile, date.year, date.month, date.day))
+    print 'downloading data, be patient...'
     run_cmd(cmd)
     if unpack:
         cmd = 'tar -xzvf %s' %outfile
         run_cmd(cmd)
+
+############################################################################
 
 def wiki2elog( datestring, runID, pagename=None, outfile=None,
                un=credentials.wiki_un, pw=credentials.wiki_pw ):
@@ -377,49 +384,135 @@ def bias_correct(images, y1, y2, prefix=None):
 
 ############################################################################
 
-def make_flat(images, outflat, gain=1.0, rdnoise=0.0, xwindow=50,
-              ywindow=50, hmin=0, hmax=65535, lowclip=0.7, highclip=1.3,
-              cleanup=True):
+def make_flat(images, outflat, side, interactive=True, cleanup=True):
 
-    '''Construct flat field from individual frames'''
+    '''
+    Construct median flat from individual frames, and then
+     normalize by fitting a response function.
+    side must be one of "red" or "blue"
+    '''
+    if side == 'red':
+        gain = REDGAIN
+        rdnoise = REDRDNOISE
+    elif side == 'blue':
+        gain = BLUEGAIN1
+        rdnoise = BLUERDNOISE
+    else:
+        raise StandardError( "side must be one of 'red','blue'" )
+    
+    if interactive:
+        interact = yes
+    else:
+        interact = no
     
     flatimages=','.join(images)
     # combine the flats
     iraf.flatcombine(flatimages, output='CombinedFlat', combine='median', 
-                     reject='avsigclip', ccdtype='', process=no, subsets=no,
-                     delete=no, clobber=no, scale='median', lsigma=3.0,
+                     reject='ccdclip', ccdtype='', process=no, subsets=no,
+                     delete=no, clobber=yes, scale='median', lsigma=3.0,
                      hsigma=3.0, gain=gain, rdnoise=rdnoise)
-    # divide by the median
-    iraf.fmedian('CombinedFlat', 'MedianFlat', xwindow, ywindow, hmin=hmin, hmax=hmax)
-    iraf.imarith('CombinedFlat', '/',  'MedianFlat', outflat)
-    # clip the result, so no values are beyond the clip limits
-    iraf.imreplace(outflat, 1.0, lower=INDEF, upper=lowclip)
-    iraf.imreplace(outflat, 1.0, lower=highclip, upper=INDEF)
+    # fit for the response function and save as the output
+    iraf.response('CombinedFlat', 'CombinedFlat', outflat, order=fitorder, interactive=interact)
+    
+    if cleanup:
+        run_cmd( 'rm CombinedFlat' )
 
+############################################################################
+
+def apply_flat(images, flat, prefix='f' ):
+    """
+    Apply flatfield correction to images.
+    - prefix defaults to 'f' if not given
+    """
+    for image in images:
+        iraf.ccdproc(image, output='%s%s' %(prefix,image),
+                     flatcor=yes, flat=flat,
+                     ccdtype='', noproc=no, fixpix=no, 
+                     overscan=no, trim=no, zerocor=no, darkcor=no,
+                     illumcor=no, fringecor=no, readcor=no, scancor=no)
+    
 ############################################################################
 
 def update_headers(images):
     """
     run uvfixhead (custom IRAF task) and calculate the airmass values
     """
-    for image in images:
-        iraf.uvfixhead(image)
-        iraf.setairmass(image)
+    images = ','.join(images)
+    iraf.uvfixhead(images)
+    iraf.setairmass(images)
 
 ############################################################################
 
-def reference_arc(image, output, reference, coordlist=COORDLIST):
+def id_arc(arc, coordlist=COORDLIST):
 
-    '''Construct reference wavelength solution from arc lamps'''
+    '''
+    Construct reference wavelength solution from arc lamps
+    '''
+    iraf.identify(arc, coordlist=coordlist)
 
-    iraf.apall(image, output=output, references=reference, interactive=no,
-               find=no, recenter=no, resize=no, edit=no, trace=no, fittrace=no,
-               extract=yes, extras=yes, review=no, background='none')
-    iraf.identify(output, coordlist=coordlist)
+############################################################################
 
-######################################################################
+def combine_arcs( arcs, output ):
+    """
+    simply combine a set of arc images into a single image
+    """
+    iraf.imarith( arcs[0], '+', arcs[1], output )
+    for i in range(2,len(arcs)):
+        iraf.imarith( output, '+', arcs[i], output )
+
+############################################################################
+# spectrum extraction
+############################################################################
+
+def extract( image, side, arc=False, output=None, interact=True, reference=None):
+    """
+    Use apall to extract the spectrum.
+    
+    If arc=True, will not fit for or subtract a background, and you must include a reference.
+    If this is not the first spectrum from a set of consecutive observations
+     of the same object, pass along the extracted first observation as 'reference';
+     this will force interact=False and will use the parameters from the reference.
+    If output is not given, follows IRAF standard and sticks ".ms." in middle of filename.
+    """
+    if output == None:
+        output = ''
+    
+    if interact:
+        interactive = yes
+    else:
+        interactive = no
+    
+    if side == 'red':
+        gain = REDGAIN
+        rdnoise = REDRDNOISE
+    elif side == 'blue':
+        gain = BLUEGAIN1
+        rdnoise = BLUERDNOISE
+    else:
+        raise StandardError( "side must be one of 'red','blue'" )
+    
+    if reference == None & arc == False:
+        iraf.apall(image, output=output, references='', interactive=interactive,
+                   find=yes, recenter=yes, resize=yes, edit=yes, trace=yes,
+                   fittrace=yes, extract=yes, extras=yes, review=yes,
+                   background='fit', weights='variance', pfit='fit1d',
+                   readnoise=rdnoise, gain=gain, nfind=1,
+                   ulimit=20, ylevel=0.01, b_sample="-35:-25,25:35", 
+                   t_function="legendre", t_order=4 )
+    elif reference != None & arc == False:
+        iraf.apall(image, output=output, references=reference, interactive=no,
+                   find=no, recenter=no, resize=no, edit=no, trace=no,
+                   fittrace=no, extract=yes, extras=yes, review=no,
+                   background='fit', readnoise=rdnoise, gain=gain )
+    elif arc:
+        iraf.apall(image, output=output, references=reference, interactive=no,
+                   find=no, recenter=no, resize=no, edit=no, trace=no, fittrace=no,
+                   extract=yes, extras=yes, review=no, background='none',
+                   readnoise=rdnoise, gain=gain)
+
+############################################################################
 # cosmic ray removal
-######################################################################
+############################################################################
 
 def clean_cosmics( fitspath, cleanpath, gain, rdnoise, maskpath=None ):
     """
@@ -504,6 +597,4 @@ def find_trim_sec( flatfile, edgebuf=5, plot=True ):
     return y1,y2
 
 ######################################################################
-    
-    
     

@@ -23,6 +23,7 @@ Plan:
 
 import shivutil as su
 import os
+from glob import glob
 
 # setup the file hierarchy, download the data, and move it around
 runID = 'uc'
@@ -43,10 +44,10 @@ su.populate_working_dir( 'uc', logfile='working/%s.log'%runID )
 os.chdir( 'working' )
 objects, flats, arcs = su.parse_logfile( '%s.log'%runID )
 
-firstblueflat = [f[0] for f in flats if f[1]==1][0]
-b_y1, b_y2 = find_trim_sec( '%sblue%.3d.fits'%(runID, firstblueflat) )
+firstblueflat = "%sblue%.3d.fits" %(runID, [f[0] for f in flats if f[1]==1][0])
+b_y1, b_y2 = find_trim_sec( firstblueflat )
 
-firstredflat = [f[0] for f in flats if f[1]==2][0]
+firstredflat = "%sred%.3d.fits" %(runID, [f[0] for f in flats if f[1]==2][0])
 r_y1, r_y2 = find_trim_sec( '%sred%.3d.fits'%(runID, firstredflat) )
 
 
@@ -59,3 +60,51 @@ allreds = ["%sred%.3d.fits"%(runID,f[0]) for f in objects+flats+arcs if f[1]==2]
 su.bias_correct_idl( allreds, r_y1, r_y2 )
 
 
+## replacing startred.cl ##
+# set airmass and fix a few header values
+allfiles = glob("b%s*.fits" %runID)
+su.update_headers( allfiles )
+
+# make the combined and normalized blue flat
+blueflats = ["b%sblue%.3d.fits" %(runID, f[0]) for f in flats if f[1]==1]
+su.make_flat( blueflats, 'nflat1', 'blue' )
+# and apply it
+blues = ["b%sblue%.3d.fits"%(runID,f[0]) for f in objects+arcs if f[1]==1]
+su.apply_flat( blues, 'nflat1' )
+
+# go through and make the combined and normalied red flats for each object, and apply them
+for i in range(2, max( [o[2] for o in objects] )+1):
+    redflats = ["b%sred%.3d.fits" %(runID, f[0]) for f in flats if f[2]==i]
+    su.make_flat( redflats, 'nflat%d'%i, 'red' )
+    reds = ["b%sred%.3d.fits"%(runID,f[0]) for f in objects+arcs if f[1]==i]
+    su.apply_flat( reds, 'nflat%d'%i )
+
+# extract all of the objects
+blues = ["fb%sblue%.3d.fits"%(runID,f[0]) for f in objects if f[1]==1]
+for b in blues:
+    su.extract( b, 'blue' )
+reds = ["fb%sred%.3d.fits"%(runID,f[0]) for f in objects if f[1]==2]
+for r in reds:
+    su.extract( r, 'red' )
+
+## replacing arcs.cl ##
+# extract the blue arc from the beginning of the night
+bluearc = ["fb%sblue%.3d.fits"%(runID, f[0]) for f in arcs if f[1]==1][0]
+su.extract( bluearc, 'blue', arc=True, reference=blues[0] )
+
+# extract the red arcs, using each associated object as a reference
+for i in range(2, max( [o[2] for o in objects] )+1):
+    redarc = ["fb%sred%.3d.fits"%(runID, f[0]) for f in arcs if f[2]==i][0]
+    redobj = ["fb%sred%.3d.fits"%(runID, f[0]) for f in objects if f[2]==i][0]
+    su.extract( redarc, 'red', arc=True, reference=redobj )
+
+# ID the blue side arc
+bluearc = ["fb%sblue%.3d.ms.fits"%(runID, f[0]) for f in arcs if f[1]==1][0]
+su.id_arc( bluearc )
+
+# sum the R1 and R2 red arcs from the beginning of the night and id the result
+R1R2 = ["fb%sred%.3d.ms.fits"%(runID, f[0]) for f in arcs if f[2]==2][:2]
+su.combine_arcs( R1R2, 'Combined_0.5_Arc.ms.fits' )
+su.id_arc( 'Combined_0.5_Arc.ms.fits' )
+
+# ID each object arc
