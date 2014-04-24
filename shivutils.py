@@ -79,18 +79,14 @@ def make_file_system( runID ):
     os.mkdir('final')
     os.chdir('..')
 
-def populate_working_dir( runID, logfile=None ):
+############################################################################
+
+def parse_logfile( logfile ):
     """
-    Take the unpacked data from the raw directory, rename files as necessary,
-     and move them into the working directory.
-    Should be run from root directory, logfile should be wiki
-     e-log format, and logfile should reside in the root folder.
-     If logfile not given, assumes logfile=runID.log
+    Parse a logfile in e-log format.
+    Returns objects, flats, and arcs as 
+     three lists, containing [obs, side, group] for each image
     """
-    if logfile == None:
-        logfile = runID+'.log'
-    
-    # parse the logfile
     objects, flats, arcs = [],[],[]
     lines = open(logfile, 'r').readlines()
     for line in lines[1:]:  #first line should be a header
@@ -114,14 +110,32 @@ def populate_working_dir( runID, logfile=None ):
         else:
             raise StandardError("error parsing %s"%logfile)
         for ob in obs:
-            objects.append( [ob, side, group] )
+            whichlist.append( [ob, side, group] )
+    
+    return objects, flats, arcs
+
+############################################################################
+
+def populate_working_dir( runID, logfile=None ):
+    """
+    Take the unpacked data from the raw directory, rename files as necessary,
+     and move them into the working directory.
+    Should be run from root directory, logfile should be wiki
+     e-log format.
+     If logfile not given, assumes logfile=runID.log
+    """
+    if logfile == None:
+        logfile = runID+'.log'
+    
+    # parse the logfile
+    objects,flats,arcs = parse_logfile(logfile)
             
     # copy over all relevant files to working directory and rename them
     for o in objects+flats+arcs:
         if o[1] == 'r':
-            run_cmd( 'cp rawdata/r%d.fits working/%sred%.2d.fits' %(o[0],runID,o[0]) )
+            run_cmd( 'cp rawdata/r%d.fits working/%sred%.3d.fits' %(o[0],runID,o[0]) )
         elif o[1] == 'b':
-            run_cmd( 'cp rawdata/r%d.fits working/%sred%.2d.fits' %(o[0],runID,o[0]) )
+            run_cmd( 'cp rawdata/r%d.fits working/%sred%.3d.fits' %(o[0],runID,o[0]) )
     
     '''
     TO DO: return objects that keep track of which arcs/flats/etc go with which object.
@@ -166,7 +180,7 @@ def get_kast_data( datestring, outfile=None, unpack=True,
         cmd = 'tar -xzvf %s' %outfile
         run_cmd(cmd)
 
-def wiki2elog( datestring, runID, pagename=None, output=None,
+def wiki2elog( datestring, runID, pagename=None, outfile=None,
                un=credentials.wiki_un, pw=credentials.wiki_pw ):
     """
     Download and parse the log from the wiki page.  Stolen heavily
@@ -175,8 +189,11 @@ def wiki2elog( datestring, runID, pagename=None, output=None,
     - runID: the alphabetical id for the run
     - pagename: if given, will override the constructed page name and downloading
       the wiki page given
-    - output: the output file; runID.log if not given
+    - outfile: the output file; runID.log if not given
     """
+    if outfile == None:
+        outfile = runID+'.log'
+    
     # construct the pagename and credentials request
     if pagename == None:
         date = date_parser.parse(datestring)
@@ -188,7 +205,7 @@ def wiki2elog( datestring, runID, pagename=None, output=None,
     group = []
     types = []
     # open the Night Summary page for the run
-    page = urllib.urlopen("http://hercules.berkeley.edu/wiki/doku.php?id="+pagename,data)
+    page = urllib.urlopen("http://hercules.berkeley.edu/wiki/doku.php?id="+pagename,creds)
     lines = page.readlines()
     page.close()
 
@@ -483,6 +500,8 @@ def find_trim_sec( flatfile, edgebuf=5, plot=True ):
         plt.xlabel('Row')
         plt.title('Best-fit trim section')
         plt.show()
+    
+    return y1,y2
 
 ######################################################################
     
