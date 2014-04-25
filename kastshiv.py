@@ -107,4 +107,27 @@ R1R2 = ["fb%sred%.3d.ms.fits"%(runID, f[0]) for f in arcs if f[2]==2][:2]
 su.combine_arcs( R1R2, 'Combined_0.5_Arc.ms.fits' )
 su.id_arc( 'Combined_0.5_Arc.ms.fits' )
 
-# ID each object arc
+# ID the first object arc interactively, making sure
+#  we handle the 0.5" arcs properly
+firstobjarc = ["fb%sred%.3d.ms.fits"%(runID, f[0]) for f in arcs if f[2]==i][2]
+su.reid_arc( firstobjarc, 'Combined_0.5_Arc.ms.fits')
+# now go through all other arcs automatically
+for i in range(3, max( [o[2] for o in objects] )+1):
+    objarc = ["fb%sred%.3d.ms.fits"%(runID, f[0]) for f in arcs if f[2]==i][0]
+    su.reid_arc( objarc, firstobjarc, interactive=False )
+
+# use the correct arcs to dispersion-correct every object
+for o in objects:
+    if o[1] == 1:
+        obj = "fb%sblue%.3d.ms.fits" %(runID, side, o[0])
+        su.disp_correct( obj, bluearc )
+    elif o[1] == 2:
+        obj = "fb%sred%.3d.ms.fits" %(runID, side, o[0])
+        arc = ["fb%sred%.3d.ms.fits" %(runID, a[0]) for a in arcs if a[2]==o[2]][0]
+        su.disp_correct( obj, arc )
+    else:
+        raise StandardError('uh oh')
+    
+    
+
+

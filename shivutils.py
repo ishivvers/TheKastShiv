@@ -35,7 +35,7 @@ import os
 import re
 
 # local
-import cosmics as cr
+from tools import cosmics as cr
 import credentials
 
 ######################################################################
@@ -443,15 +443,6 @@ def update_headers(images):
 
 ############################################################################
 
-def id_arc(arc, coordlist=COORDLIST):
-
-    '''
-    Construct reference wavelength solution from arc lamps
-    '''
-    iraf.identify(arc, coordlist=coordlist)
-
-############################################################################
-
 def combine_arcs( arcs, output ):
     """
     simply combine a set of arc images into a single image
@@ -459,6 +450,37 @@ def combine_arcs( arcs, output ):
     iraf.imarith( arcs[0], '+', arcs[1], output )
     for i in range(2,len(arcs)):
         iraf.imarith( output, '+', arcs[i], output )
+
+############################################################################
+
+def id_arc(arc, coordlist=COORDLIST):
+
+    '''
+    Construct reference wavelength solution from arc lamps
+    '''
+    iraf.identify(arc, coordlist=coordlist, function="legendre", order=4)
+
+############################################################################
+
+def reid_arc(arc, reference, interact=True, coordlist=COORDLIST):
+
+    '''
+    Construct wavelength solution from arc lamp,
+     using previous extraction as a guide.
+    '''
+    if interact:
+        interactive = yes
+    else:
+        interactive = no
+    iraf.reidentify(reference, arc, coordlist=coordlist, interactive=interactive)
+
+############################################################################
+
+def disp_correct( image, arc ):
+    """
+    Apply the wavelength solution from arc to image
+    """
+    iraf.dispcor( image, arc )
 
 ############################################################################
 # spectrum extraction
