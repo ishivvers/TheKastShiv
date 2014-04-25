@@ -5,23 +5,13 @@ The Kast Shiv: a Kast spectrocscopic reduction pipeline
 
 
 Notes:
- - for now simply incorporate IDL routines, do not replace them
- - automate absolutely everything you can
- - have a switch with three options:
-  1) show every plot and confirm along the way
-  2) save every plot for later inspection
-  3) create no plots, just do everything
- - include a decorator that logs every step
- - use log to make it so you can pick up and resume
-   a reduction from any failure point
- - automate the file structure management
- 
-Plan:
- - have this be a run-in-place script that does everything in
-   a row, and then update with logging, etcetera.
+ - currently seems to be working!
+ - next steps:
+  - incorporate cal.pro
+  - wrap as steps with a logger
 """
 
-import shivutil as su
+import shivutils as su
 import os
 from glob import glob
 
@@ -31,11 +21,11 @@ dateUT = '2013/5/17'
 datePT = '2013/5/16'
 
 su.make_file_system( runID )
-os.chdir( 'rawdata' )
+os.chdir( 'uc/rawdata' )
 su.get_kast_data( datePT )
 os.chdir( '../working' )
 su.wiki2elog( dateUT, runID )
-os chdir( '..' )
+os.chdir( '..' )
 su.populate_working_dir( 'uc', logfile='working/%s.log'%runID )
 
 
@@ -45,10 +35,10 @@ os.chdir( 'working' )
 objects, flats, arcs = su.parse_logfile( '%s.log'%runID )
 
 firstblueflat = "%sblue%.3d.fits" %(runID, [f[0] for f in flats if f[1]==1][0])
-b_y1, b_y2 = find_trim_sec( firstblueflat )
+b_y1, b_y2 = su.find_trim_sec( firstblueflat )
 
 firstredflat = "%sred%.3d.fits" %(runID, [f[0] for f in flats if f[1]==2][0])
-r_y1, r_y2 = find_trim_sec( '%sred%.3d.fits'%(runID, firstredflat) )
+r_y1, r_y2 = su.find_trim_sec( firstredflat )
 
 
 # bias correct all blue images
@@ -73,17 +63,29 @@ blues = ["b%sblue%.3d.fits"%(runID,f[0]) for f in objects+arcs if f[1]==1]
 su.apply_flat( blues, 'nflat1' )
 
 # go through and make the combined and normalied red flats for each object, and apply them
-for i in range(2, max( [o[2] for o in objects] )+1):
+allgroups = set([o[2] for o in objects])
+allgroups.remove(1)    # skip the blues
+for i in allgroups:
     redflats = ["b%sred%.3d.fits" %(runID, f[0]) for f in flats if f[2]==i]
+    if len(redflats) == 0: continue
     su.make_flat( redflats, 'nflat%d'%i, 'red' )
     reds = ["b%sred%.3d.fits"%(runID,f[0]) for f in objects+arcs if f[1]==i]
+    if len(reds) == 0: continue
     su.apply_flat( reds, 'nflat%d'%i )
 
-# extract all of the objects
+# perform cosmic ray rejection on all objects
 blues = ["fb%sblue%.3d.fits"%(runID,f[0]) for f in objects if f[1]==1]
 for b in blues:
-    su.extract( b, 'blue' )
+    su.clean_cosmics( b, "c%s"%b, 'blue' )
 reds = ["fb%sred%.3d.fits"%(runID,f[0]) for f in objects if f[1]==2]
+for r in reds:
+    su.clean_cosmics( r, "c%s"%r, 'red', maskpath='mc%s'%r )
+
+# and extract all objects
+blues = ["c%s"%b for b in blues]
+reds = ["c%s"%r for r in reds]
+for b in blues:
+    su.extract( b, 'blue' )
 for r in reds:
     su.extract( r, 'red' )
 
@@ -93,10 +95,11 @@ bluearc = ["fb%sblue%.3d.fits"%(runID, f[0]) for f in arcs if f[1]==1][0]
 su.extract( bluearc, 'blue', arc=True, reference=blues[0] )
 
 # extract the red arcs, using each associated object as a reference
-for i in range(2, max( [o[2] for o in objects] )+1):
-    redarc = ["fb%sred%.3d.fits"%(runID, f[0]) for f in arcs if f[2]==i][0]
-    redobj = ["fb%sred%.3d.fits"%(runID, f[0]) for f in objects if f[2]==i][0]
-    su.extract( redarc, 'red', arc=True, reference=redobj )
+for i in allgroups:
+    redarcs = ["fb%sred%.3d.fits"%(runID, f[0]) for f in arcs if f[2]==i]
+    redobj = ["cfb%sred%.3d.fits"%(runID, f[0]) for f in objects if f[2]==i][0]
+    for redarc in redarcs:
+        su.extract( redarc, 'red', arc=True, reference=redobj )
 
 # ID the blue side arc
 bluearc = ["fb%sblue%.3d.ms.fits"%(runID, f[0]) for f in arcs if f[1]==1][0]
@@ -109,21 +112,26 @@ su.id_arc( 'Combined_0.5_Arc.ms.fits' )
 
 # ID the first object arc interactively, making sure
 #  we handle the 0.5" arcs properly
-firstobjarc = ["fb%sred%.3d.ms.fits"%(runID, f[0]) for f in arcs if f[2]==i][2]
+firstobjarc = ["fb%sred%.3d.ms.fits"%(runID, f[0]) for f in arcs if f[2]==2][2]
 su.reid_arc( firstobjarc, 'Combined_0.5_Arc.ms.fits')
 # now go through all other arcs automatically
-for i in range(3, max( [o[2] for o in objects] )+1):
+allgroups.remove(2)
+for i in allgroups:
     objarc = ["fb%sred%.3d.ms.fits"%(runID, f[0]) for f in arcs if f[2]==i][0]
-    su.reid_arc( objarc, firstobjarc, interactive=False )
+    su.reid_arc( objarc, firstobjarc, interact=False )
 
 # use the correct arcs to dispersion-correct every object
 for o in objects:
     if o[1] == 1:
-        obj = "fb%sblue%.3d.ms.fits" %(runID, side, o[0])
+        obj = "cfb%sblue%.3d.ms.fits" %(runID, o[0])
         su.disp_correct( obj, bluearc )
     elif o[1] == 2:
-        obj = "fb%sred%.3d.ms.fits" %(runID, side, o[0])
-        arc = ["fb%sred%.3d.ms.fits" %(runID, a[0]) for a in arcs if a[2]==o[2]][0]
+        obj = "cfb%sred%.3d.ms.fits" %(runID, o[0])
+        redarcs = ["fb%sred%.3d.ms.fits" %(runID, a[0]) for a in arcs if a[2]==o[2]]
+        if o[2] == 2:
+            arc = redarcs[2]
+        else:
+            arc = redarcs[0]
         su.disp_correct( obj, arc )
     else:
         raise StandardError('uh oh')
