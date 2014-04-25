@@ -32,7 +32,7 @@ procedure fixhead (images)
 
 		    hedit(img,"OBSERVAT","lick",add+,del-,ver-,show+,upd+)
 	        hedit(img,"DISPAXIS",1,add+,del-,ver-,show+,upd+)
-	        asthedit(img,'cmds.asthedit',upd+,verbose+,oldstyl-)
+	        asthedit(img,'/o/ishivvers/kastreductions/TheKastShiv/tools/cmds.asthedit',upd+,verbose+,oldstyl-)
 		    optpa(img)
 		}
 	

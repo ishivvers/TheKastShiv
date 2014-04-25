@@ -21,7 +21,7 @@ Plan:
    a row, and then update with logging, etcetera.
 """
 
-import shivutil as su
+import shivutils as su
 import os
 from glob import glob
 

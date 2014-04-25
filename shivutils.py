@@ -24,6 +24,7 @@ Notes:
 
 # installed
 import numpy as np
+import matplotlib.pyplot as plt
 import pyfits as pf
 from pidly import IDL
 from pyraf import iraf
@@ -35,7 +36,7 @@ import os
 import re
 
 # local
-from tools import cosmics as cr
+import cosmics as cr
 import credentials
 
 ######################################################################
@@ -56,7 +57,7 @@ BLUEGAIN1=1.237
 BLUERDNOISE=3.7
 
 # location of line id list
-COORDLIST='./caldir/licklinelist.dat'
+COORDLIST='/indirect/big_scr5/ishivvers/kastreductions/TheKastShiv/licklinelist.dat'
 
 # useful for iraf interactions
 yes=iraf.yes
@@ -129,19 +130,14 @@ def populate_working_dir( runID, logfile=None ):
     
     # parse the logfile
     objects,flats,arcs = parse_logfile(logfile)
-            
+    
     # copy over all relevant files to working directory and rename them
     for o in objects+flats+arcs:
-        if o[1] == 'r':
-            run_cmd( 'cp rawdata/r%d.fits working/%sred%.3d.fits' %(o[0],runID,o[0]) )
-        elif o[1] == 'b':
+        if o[1] == 1:
+            run_cmd( 'cp rawdata/b%d.fits working/%sblue%.3d.fits' %(o[0],runID,o[0]) )
+        elif o[1] == 2:
             run_cmd( 'cp rawdata/r%d.fits working/%sred%.3d.fits' %(o[0],runID,o[0]) )
     
-    '''
-    TO DO: return objects that keep track of which arcs/flats/etc go with which object.
-    '''
-    
-
 ######################################################################
 # external communications
 ######################################################################
@@ -157,7 +153,7 @@ def run_cmd( cmd, ignore_errors=False ):
 
 ############################################################################
 
-def start_idl( idlpath = '/usr/bin/idl' ):
+def start_idl( idlpath='/apps3/rsi/idl_8.1/bin/idl' ):
     """
     start an interactive IDL session.
     """
@@ -173,17 +169,18 @@ def get_kast_data( datestring, outfile=None, unpack=True,
     Download kast data from a date (in the datestring).
     """
     if outfile == None:
-        outfile = datestring+'.alldata.tgz'
+        outfile = 'alldata.tgz'
     date = date_parser.parse(datestring)
-    print 'downloading data from %s-%s-%s (Y-M-D)' %(date.year, date.month, date.day)
     cmd = 'wget --no-check-certificate --http-user="%s" --http-passwd="%s" '+\
-            '-O %s "https://mthamilton.ucolick.org/data/%s-%s/%s/shane/?tarball=true&allfiles=true"' \
-            %(un, pw, outfile, date.year, date.month, date.day))
+            '-O %s "https://mthamilton.ucolick.org/data/%.2d-%.2d/%d/shane/?tarball=true&allfiles=true"' 
     print 'downloading data, be patient...'
-    run_cmd(cmd)
+    run_cmd( cmd %(un, pw, outfile, date.year, date.month, date.day) )
     if unpack:
         cmd = 'tar -xzvf %s' %outfile
         run_cmd(cmd)
+        run_cmd( 'mv data*/*.fits .' )
+        run_cmd( 'rm %s'%outfile )
+        run_cmd( 'rm -r data*' )
 
 ############################################################################
 
@@ -204,7 +201,7 @@ def wiki2elog( datestring, runID, pagename=None, outfile=None,
     # construct the pagename and credentials request
     if pagename == None:
         date = date_parser.parse(datestring)
-        pagename = "%.2d_%.2d_kast_%s" %(date.month, date.day, runID)
+        pagename = "%d_%.2d_kast_%s" %(date.month, date.day, runID)
     creds = urllib.urlencode({"u" : un, "p" : pw})
     # define lists to hold observation data
     obs= []
@@ -215,7 +212,7 @@ def wiki2elog( datestring, runID, pagename=None, outfile=None,
     page = urllib.urlopen("http://hercules.berkeley.edu/wiki/doku.php?id="+pagename,creds)
     lines = page.readlines()
     page.close()
-
+    
     # go through the HTML to find the beginning of the actual wiki page
     line_num=0
     while lines[line_num].strip()!='<!-- wikipage start -->':
@@ -311,7 +308,7 @@ def head_update( images, keywords, values, comment=None ):
 # bias, flatfielding, header updates
 ############################################################################
 
-def bias_correct_idl(images, y1, y2, prefix=None, idlpath = '/usr/bin/idl'):
+def bias_correct_idl(images, y1, y2, prefix=None, idlpath='/apps3/rsi/idl_8.1/bin/idl'):
     """
     Use pIDLy to interact with the trusty 'kastbias.pro' script
      to bias correct a set of images with y trim limits of y1, y2.
@@ -394,9 +391,11 @@ def make_flat(images, outflat, side, interactive=True, cleanup=True):
     if side == 'red':
         gain = REDGAIN
         rdnoise = REDRDNOISE
+        fitorder = 4
     elif side == 'blue':
         gain = BLUEGAIN1
         rdnoise = BLUERDNOISE
+        fitorder = 6
     else:
         raise StandardError( "side must be one of 'red','blue'" )
     
@@ -409,13 +408,13 @@ def make_flat(images, outflat, side, interactive=True, cleanup=True):
     # combine the flats
     iraf.flatcombine(flatimages, output='CombinedFlat', combine='median', 
                      reject='ccdclip', ccdtype='', process=no, subsets=no,
-                     delete=no, clobber=yes, scale='median', lsigma=3.0,
+                     delete=no, scale='median', lsigma=3.0,
                      hsigma=3.0, gain=gain, rdnoise=rdnoise)
     # fit for the response function and save as the output
     iraf.response('CombinedFlat', 'CombinedFlat', outflat, order=fitorder, interactive=interact)
     
     if cleanup:
-        run_cmd( 'rm CombinedFlat' )
+        run_cmd( 'rm CombinedFlat.fits' )
 
 ############################################################################
 
@@ -480,7 +479,7 @@ def disp_correct( image, arc ):
     """
     Apply the wavelength solution from arc to image
     """
-    iraf.dispcor( image, arc )
+    iraf.disp( image, arc )
 
 ############################################################################
 # spectrum extraction
@@ -513,7 +512,7 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None)
     else:
         raise StandardError( "side must be one of 'red','blue'" )
     
-    if reference == None & arc == False:
+    if (reference == None) & (arc == False):
         iraf.apall(image, output=output, references='', interactive=interactive,
                    find=yes, recenter=yes, resize=yes, edit=yes, trace=yes,
                    fittrace=yes, extract=yes, extras=yes, review=yes,
@@ -521,7 +520,7 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None)
                    readnoise=rdnoise, gain=gain, nfind=1,
                    ulimit=20, ylevel=0.01, b_sample="-35:-25,25:35", 
                    t_function="legendre", t_order=4 )
-    elif reference != None & arc == False:
+    elif (reference != None) & (arc == False):
         iraf.apall(image, output=output, references=reference, interactive=no,
                    find=no, recenter=no, resize=no, edit=no, trace=no,
                    fittrace=no, extract=yes, extras=yes, review=no,
@@ -536,19 +535,30 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None)
 # cosmic ray removal
 ############################################################################
 
-def clean_cosmics( fitspath, cleanpath, gain, rdnoise, maskpath=None ):
+def clean_cosmics( fitspath, cleanpath, side, maskpath=None ):
     """
      clean an input fits file using the LACOS algorithm 
     
     - fitspath: input file
     - cleanpath: output file
-    - gain, rdnoise: lacos parameters
+    - side: one of 'blue','red'
     - maskpath: [optional] mask output file
     """
-    sigclip = 4.5  # additional lacos parameters
-    sicfrac = 0.5
-    objlim = 1.0
+    # lacos parameters
+    objlim = 5.0
     maxiter = 3
+    
+    if side == 'red':
+        gain = REDGAIN
+        rdnoise = REDRDNOISE
+        sigclip = 10.0
+        sigfrac = 2.0
+    elif side == 'blue':
+        gain = BLUEGAIN1
+        rdnoise = BLUERDNOISE
+        sigclip = 4.5
+        sigfrac = 0.5
+    
     array, header = cr.fromfits(fitspath)
     c = cr.cosmicsimage(array, gain=gain, readnoise=rdnoise,
                         sigclip=sigclip, sigfrac=sigfrac, objlim=objlim)
@@ -587,8 +597,20 @@ def find_trim_sec( flatfile, edgebuf=5, plot=True ):
     icol = np.argmax( np.mean(data, 0) )
     y = data[:,icol]
     x = np.arange(len(data[:,icol]))
+
+    lo = np.min(y)
+    hi = np.median(y)    
+    # find estimates of the box edges
+    for i,yyy in enumerate(y):
+        if yyy > (lo + (hi-lo)/2):
+            ledge = i
+            break
+    for i,yyy in enumerate(y[::-1]):
+        if yyy > (lo + (hi-lo)/2):
+            redge = x[-1] - i
+            break
     
-    p0 = [np.min(y), np.median(y), 10, len(x)-10]
+    p0 = [lo, hi, ledge, redge]
     res = minimize(sumsqerr, p0, args=(x,y), method='Nelder-Mead')
     if not res.success:
         raise StandardError("Cannot find good fit for trim section")
