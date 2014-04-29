@@ -9,11 +9,25 @@ Notes:
  - next steps:
   - incorporate cal.pro
   - wrap as steps with a logger
+   - plan: have a class, which has a set of persistent
+           variables, which say where in the pipeline you are
+           and if you want to skip any steps, etc.
 """
 
 import shivutils as su
 import os
 from glob import glob
+
+def dict_inverse( inn, reqd=None ):
+    '''
+    Invert a dictionary, and handle duplicates by requiring reqd to
+     be in the output value (if given)
+    '''
+    out = {}
+    for k in inn.keys():
+        if (reqd == None) | (reqd in k)
+        out[inn[k]] = k
+    return out
 
 # setup the file hierarchy, download the data, and move it around
 runID = 'uc'
@@ -24,16 +38,16 @@ su.make_file_system( runID )
 os.chdir( 'uc/rawdata' )
 su.get_kast_data( datePT )
 os.chdir( '../working' )
-su.wiki2elog( dateUT, runID )
+objects, flats, arcs = su.wiki2elog( datestring=dateUT, runID=runID, outfile='%s.log'%runID  )
 os.chdir( '..' )
 su.populate_working_dir( 'uc', logfile='working/%s.log'%runID )
 
+os.chdir( 'working' )
 
+obj_files = ["%sblue%.3d.fits" for o in objects if o[1]==1 +\
+            ["%sred%.3d.fits" for o in objects if o[1]==2]
 # find the trim sections for the red and blue images,
 #  using the first red and blue flats
-os.chdir( 'working' )
-objects, flats, arcs = su.parse_logfile( '%s.log'%runID )
-
 firstblueflat = "%sblue%.3d.fits" %(runID, [f[0] for f in flats if f[1]==1][0])
 b_y1, b_y2 = su.find_trim_sec( firstblueflat )
 
@@ -82,12 +96,14 @@ for r in reds:
     su.clean_cosmics( r, "c%s"%r, 'red', maskpath='mc%s'%r )
 
 # and extract all objects
-blues = ["c%s"%b for b in blues]
 reds = ["c%s"%r for r in reds]
-for b in blues:
-    su.extract( b, 'blue' )
 for r in reds:
     su.extract( r, 'red' )
+    print 'what if this is the second obs of an object!? Handle that!'
+blues = ["c%s"%b for b in blues]
+for b in blues:
+    # find which object this observation is
+    HERE HERE HERE
 
 ## replacing arcs.cl ##
 # extract the blue arc from the beginning of the night

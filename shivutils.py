@@ -31,9 +31,12 @@ from pyraf import iraf
 from glob import glob
 from scipy.optimize import minimize
 from dateutil import parser as date_parser
+from BeautifulSoup import BeautifulSoup
+from difflib import get_close_matches
 import urllib
 import os
 import re
+
 
 # local
 import cosmics as cr
@@ -85,7 +88,7 @@ def make_file_system( runID ):
 def parse_logfile( logfile ):
     """
     Parse a logfile in e-log format.
-    Returns objects, flats, and arcs as 
+    Returns image numbers for objects, arcs, and flats as 
      three lists, containing [obs, side, group] for each image
     """
     objects, flats, arcs = [],[],[]
@@ -184,16 +187,17 @@ def get_kast_data( datestring, outfile=None, unpack=True,
 
 ############################################################################
 
-def wiki2elog( datestring, runID, pagename=None, outfile=None,
+
+def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None,
                un=credentials.wiki_un, pw=credentials.wiki_pw ):
     """
-    Download and parse the log from the wiki page.  Stolen heavily
-     from K.Clubb's "wiki2elog.py" (thanks Kelsey!)
+    Download and parse the log from the wiki page.
     - datestring: a parsable string representing the recorded log's date
     - runID: the alphabetical id for the run
-    - pagename: if given, will override the constructed page name and downloading
+    - pagename: if given, will override the constructed page name and download
       the wiki page given
-    - outfile: the output file; runID.log if not given
+    NOTE: must have (datestring and runID) OR pagename
+    - outfile: include a path to write out a silverclubb-formatted logfile, if desired
     """
     if outfile == None:
         outfile = runID+'.log'
@@ -203,51 +207,49 @@ def wiki2elog( datestring, runID, pagename=None, outfile=None,
         date = date_parser.parse(datestring)
         pagename = "%d_%.2d_kast_%s" %(date.month, date.day, runID)
     creds = urllib.urlencode({"u" : un, "p" : pw})
-    # define lists to hold observation data
-    obs= []
-    side = []
-    group = []
-    types = []
-    # open the Night Summary page for the run
-    page = urllib.urlopen("http://hercules.berkeley.edu/wiki/doku.php?id="+pagename,creds)
-    lines = page.readlines()
-    page.close()
     
-    # go through the HTML to find the beginning of the actual wiki page
-    line_num=0
-    while lines[line_num].strip()!='<!-- wikipage start -->':
-        line_num += 1 
-    line_num += 1
-    while lines[line_num].strip()=='':
-        line_num += 1
-    # if permission was denied, alert user and end program
-    if lines[line_num].find("Permission Denied")!=-1:
-        raise StandardError( 'Username/password combination invalid for the FlipperWiki!' )
-
-    # loop through the entire table (assuming that all of the observations are listed there)
-    while lines[line_num].strip()!='</table>':
-        # assume each table row tag is an image (or run of images)
-        if lines[line_num].find('</td>')!=-1:
-            # break line into each table entry
-            pieces = lines[line_num].split('</td>')
-            if pieces[2].strip().split('>')[1].strip()!='x':
-                # get Obs #
-                obs += [pieces[0].strip().split('>')[1].strip()]
-                # get Side
-                side += [pieces[2].strip().split('>')[1].strip()]
-                # get Group
-                group += [pieces[3].strip().split('>')[1].strip()]
-                # get Type
-                types += [pieces[4].strip().split('>')[1].strip()]
-        # go to next line
-        line_num += 1
-
-    # write all observations to file and close it
-    output = open(outfile,'w')
-    output.write('Obs     Side  Group  Type\n')
-    for n in range(len(obs)):
-        output.write(obs[n]+' '*(8-len(obs[n]))+side[n]+' '*(6-len(side[n]))+group[n]+' '*(7-len(group[n]))+types[n]+'\n')
-    output.close()
+    # open the Night Summary page for the run
+    soup = BeautifulSoup( urllib.urlopen("http://hercules.berkeley.edu/wiki/doku.php?id="+pagename,creds) )
+    
+    # make sure the table is there
+    if soup.body.table == None:
+        raise StandardError( "wiki page did not load; are your credentials in order?" )
+    else:
+        rows = table.findAll('tr')
+    
+    if outfile != None:
+        output = open(outfile,'w')
+        output.write('Obs     Side  Group  Type\n')
+    
+    objects, arcs, flats = [], [], []
+    for row in rows[1:]: #skip header row
+        cols = row.findAll('td')
+        try:
+            obsnum = int(cols[0].string)
+            sidenum = int(cols[2].string)
+            groupnum = int(cols[3].string)
+            obstype = cols[4].string.strip()
+        except ValueError:
+            # for now, skip over any imaging, etc
+            continue
+        # for now, skip anything that's not uvir
+        if sidenum not in [1,2]:
+            continue
+        if obstype == 'obj':
+            # find the and clean up the object's name
+            objname = cols[1].string.lower().strip('uv').strip('ir').strip()
+            objects.append( [obsnum, sidenum, groupnum, objname])
+        elif obstype == 'arc':
+            arcs.append( [obsnum, sidenum, groupnum] )
+        elif obstype == 'flat':
+            flats.append( [obsnum, sidenum, groupnum] )
+        
+        if outfile != None:
+            output.write( "%d %6.d %6.d %s" %(1, sidenum, groupnum, obstype.rjust(7))
+    if outfile != None:
+        output.close()
+    
+    return objects, arcs, flats
 
 ############################################################################
 # fits file management
@@ -304,6 +306,21 @@ def head_update( images, keywords, values, comment=None ):
         hdu.writeto( image, clobber=True )
         hdu.close()
 
+############################################################################
+
+def get_object_names( obj_files ):
+    """
+    Opens all files in obj_files and searches for the object name in the fits header.
+    Returns a dictionary with the ID string for keys and object name as the value.
+     e.g.: {"red29":"SN2014J", "blue042":"feige34", ... }
+    """
+    outdict = {}
+    for of in obj_files:
+        idstr = re.search('blue\d+|red\d+', of).group()
+        objname = pf.open( of )[0].header["object"]
+        outdict[ idstr ] = objname
+    return outdict
+    
 ############################################################################
 # bias, flatfielding, header updates
 ############################################################################
@@ -485,7 +502,22 @@ def disp_correct( image, arc ):
 # spectrum extraction
 ############################################################################
 
-def extract( image, side, arc=False, output=None, interact=True, reference=None):
+def parse_apfile( apfile ):
+    """
+    Open an iraf.apall apfile and search for and pull out the background and
+     aperture properties.
+    Returns a tuple of (lo, hi) for aperture, low background, and high background, in that order
+     e.g.: aperture, lo_bg, hi_bg = parse_apfile( apfile )
+    """
+    s = open(apfile,'r').read()
+    lo = float([l for l in lines if 'low' in l][0].split(' ')[-1].strip())
+    hi = float([l for l in lines if 'high' in l][0].split(' ')[-1].strip())
+    sampline = [l for l in lines if 'sample' in l][0]
+    lbglo, lbghi, rbglo, rbghi = map(float, re.findall('-?\d+',sampline))
+    return (lo,hi), (lbglo, lbghi), (rbglo, rbghi)
+
+def extract( image, side, arc=False, output=None, interact=True, reference=None,
+             apfile=None, apfact=None):
     """
     Use apall to extract the spectrum.
     
@@ -494,6 +526,9 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None)
      of the same object, pass along the extracted first observation as 'reference';
      this will force interact=False and will use the parameters from the reference.
     If output is not given, follows IRAF standard and sticks ".ms." in middle of filename.
+    If apfile is given, will use the aperture and background properties from that apfile,
+     first multiplying by apfact if given (accounts for pixel size differences).
+     Note: using either arc or reference keys will override the apfile.
     """
     if output == None:
         output = ''
@@ -517,7 +552,7 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None)
                    find=yes, recenter=yes, resize=yes, edit=yes, trace=yes,
                    fittrace=yes, extract=yes, extras=yes, review=yes,
                    background='fit', weights='variance', pfit='fit1d',
-                   readnoise=rdnoise, gain=gain, nfind=1,
+                   readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
                    ulimit=20, ylevel=0.01, b_sample="-35:-25,25:35", 
                    t_function="legendre", t_order=4 )
     elif (reference != None) & (arc == False):
@@ -530,6 +565,20 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None)
                    find=no, recenter=no, resize=no, edit=no, trace=no, fittrace=no,
                    extract=yes, extras=yes, review=no, background='none',
                    readnoise=rdnoise, gain=gain)
+    elif (apfile != None):
+        ap, lbg, rbg = parse_apfile( apfile )
+        if apfact == None:
+            apfact = 1.0
+        iraf.apall(image, output=output, references='', interactive=interactive,
+                   find=no, recenter=yes, resize=no, edit=yes, trace=yes,
+                   fittrace=yes, extract=yes, extras=yes, review=yes,
+                   background='fit', weights='variance', pfit='fit1d',
+                   readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
+                   ulimit=20, ylevel=0.01, t_function="legendre", t_order=4,
+                   lower=ap[0]*apfact, upper=ap[1]*apfact,
+                   b_sample="%.2f:%.2f,%.2f::.2f" %(lbg[0]*apfact, lbg[1]*apfact, rbg[0]*apfact, rbg[1]*apfact) )
+    else:
+        raise StandardError( "unacceptable keyword combination" )
 
 ############################################################################
 # cosmic ray removal
