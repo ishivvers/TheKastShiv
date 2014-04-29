@@ -95,15 +95,46 @@ reds = ["fb%sred%.3d.fits"%(runID,f[0]) for f in objects if f[1]==2]
 for r in reds:
     su.clean_cosmics( r, "c%s"%r, 'red', maskpath='mc%s'%r )
 
-# and extract all objects
-reds = ["c%s"%r for r in reds]
-for r in reds:
-    su.extract( r, 'red' )
-    print 'what if this is the second obs of an object!? Handle that!'
-blues = ["c%s"%b for b in blues]
-for b in blues:
-    # find which object this observation is
-    HERE HERE HERE
+# extract all red objects on the first path
+extracted_objects = []  #used to keep track of multiple observations of the same object
+extracted_images = []
+for o in objects:
+    if o[1] != 2:
+        continue
+    r = "cfb%sred%.3d.fits"%(runID,o[0])
+    # If we've already extracted a spectrum of this object, use the first extraction
+    #  as a reference.
+    try:
+        reference = extracted_images[ extracted_objects.index( o[3] ) ]
+        su.extract( r, 'red', reference=reference )
+    except ValueError:
+        su.extract( r, 'red' )
+    extracted_objects.append( o[3] )
+    extracted_images.append( r )
+# extract all blue objects on the first path
+for o in objects:
+    if o[1] != 1:
+        continue
+    b = "cfb%sblue%.3d.fits"%(runID,o[0])
+    # If we've already extracted a spectrum of this object, use the first extraction
+    #  as a reference or apfile reference (accounting for differences in blue and red pixel scales).
+    try:
+        reference = extracted_images[ extracted_objects.index( o[3] ) ]
+        if 'blue' in reference:
+            # go ahead and simply use as a reference
+            su.extract( b, 'blue', reference=reference )
+        elif 'red' in reference:
+            # Need to pass along apfile and conversion factor to map the red extraction
+            #  onto this blue image. Blue CCD has a plate scale 1.8558 times larger than the red.
+            apfile = 'database/ap'+reference.strip('.fits')
+            su.extract( b, 'blue', apfile=apfile, apfact=1.8558)
+        else:
+            raise StandardError( 'We have a situation with aperature referencing.' )
+    except ValueError:
+        su.extract( b, 'blue' )
+    extracted_objects.append( o[3] )
+    extracted_images.append( b )
+
 
 ## replacing arcs.cl ##
 # extract the blue arc from the beginning of the night

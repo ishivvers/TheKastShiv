@@ -547,7 +547,7 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None,
     else:
         raise StandardError( "side must be one of 'red','blue'" )
     
-    if (reference == None) & (arc == False):
+    if (reference == None) & (arc == False) & (apfile == None):
         iraf.apall(image, output=output, references='', interactive=interactive,
                    find=yes, recenter=yes, resize=yes, edit=yes, trace=yes,
                    fittrace=yes, extract=yes, extras=yes, review=yes,
