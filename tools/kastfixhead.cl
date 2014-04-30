@@ -1,6 +1,6 @@
 procedure fixhead (images)
 
-# fixhead.cl
+# kastfixhead.cl
 #
 #  Updates and fixes a few header values in
 #   Kast ccd images.
