@@ -28,10 +28,8 @@ os.chdir( 'uc/rawdata' )
 su.get_kast_data( datePT )
 os.chdir( '../working' )
 objects, flats, arcs = su.wiki2elog( datestring=dateUT, runID=runID, outfile='%s.log'%runID  )
-os.chdir( '..' )
-su.populate_working_dir( 'uc', logfile='working/%s.log'%runID )
+su.populate_working_dir( 'uc', logfile='%s.log'%runID )
 
-os.chdir( 'working' )
 
 obj_files = ["%sblue%.3d.fits" for o in objects if o[1]==1 +\
             ["%sred%.3d.fits" for o in objects if o[1]==2]

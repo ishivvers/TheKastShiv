@@ -127,7 +127,7 @@ def populate_working_dir( runID, logfile=None ):
     """
     Take the unpacked data from the raw directory, rename files as necessary,
      and move them into the working directory.
-    Should be run from root directory, logfile should be wiki
+    Should be run from working directory, logfile should be wiki
      e-log format.
      If logfile not given, assumes logfile=runID.log
     """
@@ -140,9 +140,9 @@ def populate_working_dir( runID, logfile=None ):
     # copy over all relevant files to working directory and rename them
     for o in objects+flats+arcs:
         if o[1] == 1:
-            run_cmd( 'cp rawdata/b%d.fits working/%sblue%.3d.fits' %(o[0],runID,o[0]) )
+            run_cmd( 'cp ../rawdata/b%d.fits %sblue%.3d.fits' %(o[0],runID,o[0]) )
         elif o[1] == 2:
-            run_cmd( 'cp rawdata/r%d.fits working/%sred%.3d.fits' %(o[0],runID,o[0]) )
+            run_cmd( 'cp ../rawdata/r%d.fits %sred%.3d.fits' %(o[0],runID,o[0]) )
     
 ######################################################################
 # external communications
