@@ -497,9 +497,10 @@ def reid_arc(arc, reference, interact=True, coordlist=COORDLIST):
 
 def disp_correct( image, arc ):
     """
-    Apply the wavelength solution from arc to image
+    Apply the wavelength solution from arc to image, using the helper
+     task mydisp.cl
     """
-    iraf.disp( image, arc )
+    iraf.mydisp( image, arc )
 
 ############################################################################
 # spectrum extraction
@@ -628,18 +629,100 @@ def clean_cosmics( fitspath, cleanpath, side, maskpath=None ):
 def id_standard( obj_name ):
     """
     Matches obj_name (a string) to known red and blue standards.
-    Calibration files for all of the standards below must exist in 
-     the calibration directory.
+    Returns None if not a standard, returns (name, side) if it is
+     (where side = 1 for blue and 2 for red)
+    The IDL script abcalc.pro must know about all of these objects!
     """
-    standards = [('feige34', 2), ('feige110', 2), ('hz44', 2), 
-                 ('bd284211', 2), ('g191b2b', 2), 
-                 ('bd262606', 1), ('hd84937',1 ), ('hd19445', 1)]
-
+    # name, side (1=blue, 2=red)
+    standards = {'feige34': 1, 'feige110' : 1, 'hz44' : 1, 
+                 'bd284211' : 1, 'g191b2b' : 1, 'bd174708' : 2,
+                 'bd262606' : 2, 'hd84937' : 2, 'hd19445' : 2}
+                 
     # cleanup the input object name
     obj_name = obj_name.lower().replace(' ','')
-    # 
+    
+    # get the best match
+    try:
+        std_name = get_close_matches( a, standards, 1 )[0]
+    except IndexError:
+        return None
+    
+    return std_name, standards[std_name]
 
+######################################################################
 
+def match_science_and_standards( allobjects ):
+    """
+    Takes in a list of the filenames for all observed objects, identifies the 
+     standard star observations, and associates each object
+     with the standard taken at the closest airmass.
+    Returns a dictionary for each side (blue, red) with the standard observations 
+     as the keys and a list of associated science observations as
+     the values.
+    """
+    blue_outdict = {}
+    red_outdict = {}
+    
+    # first get all of the standards
+    airmasses = []
+    std_names = []
+    for fname in allobjects:
+        objname = head_get( fname, 'OBJECT' )
+        std_id = id_standard( abjname )
+        if std_id == None:
+            continue
+        
+        outdict[ fname ] = []
+        std_names.append( fname )
+        airmasses.append( head_get( fname, 'AIRMASS' ) )
+        if (std_id[1] == 1) and 'red' in fname:
+            red_outdict[ fname ] = []
+        elif (std_id[1] == 2) and 'blue' in fname:
+            blue_outdict[ fname ] = []
+        else:
+            raise StandardError( "attempting to use a standard on the wrong side!" )
+    
+    airmasses = np.array(airmasses)
+    # now associate each science obs with a standard
+    for fname in allobjects:
+        objname = head_get( fname, 'OBJECT' )
+        std_id = id_standard( objname )
+        if std_id != None:
+            continue
+        am = head_get( fname, 'AIRMASS' )
+        std_match = std_names[ np.argmin(np.abs(am-airmasses)) ]
+        if 'red' in fname:
+            red_outdict[ std_match ].append( fname )
+        elif 'blue' in fname:
+            blue_outdict[ std_match ].append( fname )
+        else:
+            raise StandardError('augghh! whose side am I on!?!?')
+        
+        return blue_outdict, red_outdict
+
+######################################################################
+
+def calibrate_idl( input_dict, idlpath='/apps3/rsi/idl_8.1/bin/idl', cleanup=True ):
+    """
+    Runs the idl task cal.pro on the files given in the input_dict.
+     input_dict should have standard observations for keys and lists of
+     associated science observations as values.
+    """
+    for std in input_dict.keys():
+        # create an input file
+        ftmp = open('cal.input','w')
+        ftmp.write( '%s\n'%std )
+        for val in input_dict[std]:
+            ftmp.write( '%s\n'%std )
+        ftmp.close()
+        
+        # give the user some feedback
+        print '\n\nStarting IDL & cal.pro'
+        print 'Input file: cal.input'
+        
+        idl = IDL( idlpath )
+        idl.pro("cal")
+        idl.close()
 
 ######################################################################
 # automation tools

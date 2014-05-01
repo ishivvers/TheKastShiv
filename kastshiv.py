@@ -18,17 +18,6 @@ import shivutils as su
 import os
 from glob import glob
 
-def dict_inverse( inn, reqd=None ):
-    '''
-    Invert a dictionary, and handle duplicates by requiring reqd to
-     be in the output value (if given)
-    '''
-    out = {}
-    for k in inn.keys():
-        if (reqd == None) | (reqd in k)
-        out[inn[k]] = k
-    return out
-
 # setup the file hierarchy, download the data, and move it around
 runID = 'uc'
 dateUT = '2013/5/17'
@@ -183,6 +172,16 @@ for o in objects:
     else:
         raise StandardError('uh oh')
     
-    
 
+### replacing make_final_input_lists.py ###
+allobjects = ["cfb%sblue%.3d.ms.fits"%(runID,o[0]) for o in objects if o[1]==1] +\
+             ["cfb%sred%.3d.ms.fits"%(runID,o[0]) for o in objects if o[1]==2]
+blue_std_dict, red_std_dict = su.match_science_and_standards( allobjects )
 
+# run cal.pro on the blue side, and then the red #
+su.calibrate_idl( blue_std_dict )
+su.calibrate_idl( red_std_dict )
+
+# and, finally, run wombat to combine the spectra
+print 'run wombat as needed!'
+su.start_idl()
