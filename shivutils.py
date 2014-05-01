@@ -96,57 +96,21 @@ def make_file_system( runID ):
 
 ############################################################################
 
-def parse_logfile( logfile ):
-    """
-    Parse a logfile in e-log format.
-    Returns image numbers for objects, arcs, and flats as 
-     three lists, containing [obs, side, group] for each image
-    """
-    objects, flats, arcs = [],[],[]
-    lines = open(logfile, 'r').readlines()
-    for line in lines[1:]:  #first line should be a header
-        line = line.split()
-        which = line[-1]
-        side, group = map(int, line[1:3])
-        
-        # handle individual object numbers or ranges
-        if '-' in line[0]:
-            i,j = map(int, line[0].split('-'))
-            obs = range( i, j+1 )
-        else:
-            obs = [int(line[0])]
-        
-        if which == 'obj':
-            whichlist = objects
-        elif which == 'flat':
-            whichlist = flats
-        elif which == 'arc':
-            whichlist = arcs
-        else:
-            raise StandardError("error parsing %s"%logfile)
-        for ob in obs:
-            whichlist.append( [ob, side, group] )
-    
-    return objects, flats, arcs
-
-############################################################################
-
-def populate_working_dir( runID, logfile=None ):
+def populate_working_dir( runID, logfile=None, all_obs=None ):
     """
     Take the unpacked data from the raw directory, rename files as necessary,
      and move them into the working directory.
-    Should be run from working directory, logfile should be wiki
-     e-log format.
-     If logfile not given, assumes logfile=runID.log
+    Should be run from working directory, and either logfile (path to file)
+     or all_obs (list of observations, i.e. result of wiki2elog) must be given.
     """
-    if logfile == None:
-        logfile = runID+'.log'
     
-    # parse the logfile
-    objects,flats,arcs = parse_logfile(logfile)
+    if logfile != None:
+        # parse the logfile
+        objects,arcs,flats = wiki2elog( infile=logfile )
+        all_obs = objects+arcs+flats
     
     # copy over all relevant files to working directory and rename them
-    for o in objects+flats+arcs:
+    for o in all_obs:
         if o[1] == 1:
             run_cmd( 'cp ../rawdata/b%d.fits %sblue%.3d.fits' %(o[0],runID,o[0]) )
         elif o[1] == 2:

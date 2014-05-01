@@ -31,7 +31,7 @@ objects, arcs, flats = su.wiki2elog( datestring=dateUT, runID=runID, outfile='%s
 su.populate_working_dir( 'uc', logfile='%s.log'%runID )
 
 
-obj_files = ["%sblue%.3d.fits" for o in objects if o[1]==1 +\
+obj_files = ["%sblue%.3d.fits" for o in objects if o[1]==1] +\
             ["%sred%.3d.fits" for o in objects if o[1]==2]
 # find the trim sections for the red and blue images,
 #  using the first red and blue flats
