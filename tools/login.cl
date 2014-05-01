@@ -48,7 +48,8 @@ showtype = yes
 package user
 
 task    kastfixhead = home$kastfixhead.cl
-task    optpa=home$scripts/optpa.cl
+task    optpa=home$optpa.cl
+task    mydisp=home$mydisp.cl
 
 if (access ("home$loginuser.cl"))
     cl < "home$loginuser.cl"
