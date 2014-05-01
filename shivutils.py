@@ -4,8 +4,9 @@ Utilities library for the Kast Shiv
 
 Author: Isaac Shivvers, ishivvers@berkeley.edu
 
-Steals heavily from Brad Cenko's kast_redux and iqutils packages.
-(thanks Brad!)
+Steals heavily from Brad Cenko's kast_redux and iqutils packages,
+as well as the SilverClubb reduction pipeline.
+(Thanks Brad, Jeff, and Kelsey!)
 
 
 Notes:
@@ -13,9 +14,6 @@ Notes:
     minima in the standard star spectra, afterwhich you can fit
     with spectools.
  - e.g.: mins = scipy.signal.argrelmin( fl, order=25 )
-
- - for now, use pIDLy with the IDL.interact() command to run cal.pro, etc
- example: idl.pro("kastbias",'r6.fits',y1=46,y2=246)
 """
 
 ######################################################################
@@ -59,10 +57,20 @@ BLUEGAIN1=1.2
 BLUEGAIN2=1.237
 BLUERDNOISE=3.7
 
-HOMEDIR='/indirect/big_scr5/ishivvers/kastreductions/TheKastShiv/'
+from platform import node
+# give the path to the IDL executable
+# and the home folder
+if node() == 'classy':
+    IDLPATH='/home/isaac/Working/code/IDL/idl/bin/idl'
+    HOMEDIR='/home/isaac/Working/code/kast_reductions/'
+elif node() == 'beast.berkeley.edu':
+    IDLPATH='/apps3/rsi/idl_8.1/bin/idl'
+    HOMEDIR='/o/ishivvers/kastreductions/TheKastShiv/'
+else:
+    raise StandardError("Where am I?!")
 # location of line id list
 COORDLIST=HOMEDIR+'tools/licklinelist.dat'
-LOGINCL=HOMEDIR='tools/login.cl'
+LOGINCL=HOMEDIR+'tools/login.cl'
 
 # useful for iraf interactions
 yes=iraf.yes
@@ -78,8 +86,8 @@ def make_file_system( runID ):
     Creates the file system heirarchy for kast reductions, with
      the root location where the command was run from.
     """
-    os.mkdir('uc')
-    os.chdir('uc')
+    os.mkdir(runID)
+    os.chdir(runID)
     os.mkdir('rawdata')
     os.mkdir('working')
     run_cmd('cp %s working/.' %LOGINCL)
@@ -159,7 +167,7 @@ def run_cmd( cmd, ignore_errors=False ):
 
 ############################################################################
 
-def start_idl( idlpath='/apps3/rsi/idl_8.1/bin/idl' ):
+def start_idl( idlpath=IDLPATH ):
     """
     start an interactive IDL session.
     """
@@ -191,66 +199,119 @@ def get_kast_data( datestring, outfile=None, unpack=True,
 ############################################################################
 
 
-def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None,
+def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None, infile=None,
                un=credentials.wiki_un, pw=credentials.wiki_pw ):
     """
-    Download and parse the log from the wiki page.
+    If given infile, will parse that logfile (SilverClubb format, but including object names).
+    If not given infile, must be given pagename OR (runID and datestring),
+     and this script will download and parse the log from the wiki page.
     - datestring: a parsable string representing the recorded log's date
     - runID: the alphabetical id for the run
-    - pagename: if given, will override the constructed page name and download
-      the wiki page given
-    NOTE: must have (datestring and runID) OR pagename
     - outfile: include a path to write out a silverclubb-formatted logfile, if desired
     """
-    if outfile == None:
-        outfile = runID+'.log'
-    
-    # construct the pagename and credentials request
-    if pagename == None:
-        date = date_parser.parse(datestring)
-        pagename = "%d_%.2d_kast_%s" %(date.month, date.day, runID)
-    creds = urllib.urlencode({"u" : un, "p" : pw})
-    
-    # open the Night Summary page for the run
-    soup = BeautifulSoup( urllib.urlopen("http://hercules.berkeley.edu/wiki/doku.php?id="+pagename,creds) )
-    
-    # make sure the table is there
-    if soup.body.table == None:
-        raise StandardError( "wiki page did not load; are your credentials in order?" )
+    if infile != None:
+        objects, arcs, flats = [], [], []
+        # parse a local log, skip the header
+        lines = open(infile,'r').readlines()[1:] 
+        for l in lines:
+            try:
+                l = l.split()
+                if '-' in l[0]:
+                    lo,hi = map(int, l[0].split('-'))
+                    obsnums = range(lo, hi+1)
+                else:
+                    obsnums = [int(l[0])]
+                sidenum = int(l[1])
+                groupnum = int(l[2])
+                obstype = l[3]
+            except ValueError:
+                # for now, skip over any imaging, etc
+                continue
+            # for now, skip anything that's not uvir
+            if sidenum not in [1,2]:
+                continue
+            if obstype == 'obj':
+                objname = l[4]
+                for on in obsnums:
+                    objects.append( [on, sidenum, groupnum, obstype, objname])
+            elif obstype == 'arc':
+                for on in obsnums:
+                    arcs.append( [on, sidenum, groupnum, obstype] )
+            elif obstype == 'flat':
+                for on in obsnums:
+                    flats.append( [on, sidenum, groupnum, obstype] )
+            else:
+                raise StandardError('Error reading log!')
+
+
     else:
-        rows = table.findAll('tr')
-    
-    if outfile != None:
-        output = open(outfile,'w')
-        output.write('Obs     Side  Group  Type\n')
-    
-    objects, arcs, flats = [], [], []
-    for row in rows[1:]: #skip header row
-        cols = row.findAll('td')
-        try:
-            obsnum = int(cols[0].string)
-            sidenum = int(cols[2].string)
-            groupnum = int(cols[3].string)
-            obstype = cols[4].string.strip()
-        except ValueError:
-            # for now, skip over any imaging, etc
-            continue
-        # for now, skip anything that's not uvir
-        if sidenum not in [1,2]:
-            continue
-        if obstype == 'obj':
-            # find the and clean up the object's name
-            objname = cols[1].string.lower().strip('uv').strip('ir').strip()
-            objects.append( [obsnum, sidenum, groupnum, objname])
-        elif obstype == 'arc':
-            arcs.append( [obsnum, sidenum, groupnum] )
-        elif obstype == 'flat':
-            flats.append( [obsnum, sidenum, groupnum] )
+        # download and parse the online wiki, saving to file if requested
+        if outfile == None:
+            outfile = runID+'.log'
         
+        # construct the pagename and credentials request
+        if pagename == None:
+            date = date_parser.parse(datestring)
+            pagename = "%d_%.2d_kast_%s" %(date.month, date.day, runID)
+        creds = urllib.urlencode({"u" : un, "p" : pw})
+        
+        # open the Night Summary page for the run
+        soup = BeautifulSoup( urllib.urlopen("http://hercules.berkeley.edu/wiki/doku.php?id="+pagename,creds) )
+        
+        # make sure the table is there
+        if soup.body.table == None:
+            raise StandardError( "wiki page did not load; are your credentials in order?" )
+        else:
+            rows = soup.body.table.findAll('tr')
+
+        # emulate the SilverClubb table format
         if outfile != None:
-            output.write( "%d %6.d %6.d %s" %(1, sidenum, groupnum, obstype.rjust(7))
-    if outfile != None:
-        output.close()
+            output = open(outfile,'w')
+            output.write('Obs      Side   Group  Type     Name\n')
+        
+        objects, arcs, flats = [], [], []
+        for row in rows[1:]: #skip header row
+            cols = row.findAll('td')
+            try:
+                # handle ranges properly
+                if '-' in cols[0].string:
+                    lo,hi = map(int, cols[0].string.split('-'))
+                    obsnums = range(lo, hi+1)
+                else:
+                    obsnums = [int(cols[0].string)]
+                sidenum = int(cols[2].string)
+                groupnum = int(cols[3].string)
+                obstype = cols[4].string.strip()
+            except ValueError:
+                # for now, skip over any imaging, etc
+                continue
+            # for now, skip anything that's not uvir
+            if sidenum not in [1,2]:
+                continue
+            if obstype == 'obj':
+                # find the and clean up the object's name
+                objname = cols[1].string.lower().strip().strip('uv').strip('ir').strip()
+                for on in obsnums:
+                    objects.append( [on, sidenum, groupnum, obstype, objname])
+            elif obstype == 'arc':
+                for on in obsnums:
+                    arcs.append( [on, sidenum, groupnum, obstype] )
+            elif obstype == 'flat':
+                for on in obsnums:
+                    flats.append( [on, sidenum, groupnum, obstype] )
+            else:
+                raise StandardError('Error reading log!')
+
+            # add to output log 
+            if outfile != None:
+                if obstype == 'obj':
+                    output.write( "%s %s %s %s %s\n" %(cols[0].string.strip().ljust(8), cols[2].string.strip().ljust(6),
+                                                    cols[3].string.strip().ljust(6), obstype.ljust(8), objname) )
+                else:
+                    output.write( "%s %s %s %s\n" %(cols[0].string.strip().ljust(8), cols[2].string.strip().ljust(6),
+                                                    cols[3].string.strip().ljust(6), obstype) )
+        if outfile != None:
+            output.close()
     
     return objects, arcs, flats
 
@@ -328,7 +389,7 @@ def get_object_names( obj_files ):
 # bias, flatfielding, header updates
 ############################################################################
 
-def bias_correct_idl(images, y1, y2, prefix=None, idlpath='/apps3/rsi/idl_8.1/bin/idl'):
+def bias_correct_idl(images, y1, y2, prefix=None, idlpath=IDLPATH):
     """
     Use pIDLy to interact with the trusty 'kastbias.pro' script
      to bias correct a set of images with y trim limits of y1, y2.
@@ -702,7 +763,7 @@ def match_science_and_standards( allobjects ):
 
 ######################################################################
 
-def calibrate_idl( input_dict, idlpath='/apps3/rsi/idl_8.1/bin/idl', cleanup=True ):
+def calibrate_idl( input_dict, idlpath=IDLPATH, cleanup=True ):
     """
     Runs the idl task cal.pro on the files given in the input_dict.
      input_dict should have standard observations for keys and lists of

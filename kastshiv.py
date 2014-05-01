@@ -27,7 +27,7 @@ su.make_file_system( runID )
 os.chdir( 'uc/rawdata' )
 su.get_kast_data( datePT )
 os.chdir( '../working' )
-objects, flats, arcs = su.wiki2elog( datestring=dateUT, runID=runID, outfile='%s.log'%runID  )
+objects, arcs, flats = su.wiki2elog( datestring=dateUT, runID=runID, outfile='%s.log'%runID  )
 su.populate_working_dir( 'uc', logfile='%s.log'%runID )
 
 
@@ -92,11 +92,11 @@ for o in objects:
     # If we've already extracted a spectrum of this object, use the first extraction
     #  as a reference.
     try:
-        reference = extracted_images[ extracted_objects.index( o[3] ) ]
+        reference = extracted_images[ extracted_objects.index( o[4] ) ]
         su.extract( r, 'red', reference=reference )
     except ValueError:
         su.extract( r, 'red' )
-    extracted_objects.append( o[3] )
+    extracted_objects.append( o[4] )
     extracted_images.append( r )
 # extract all blue objects on the second pass
 for o in objects:
@@ -106,7 +106,7 @@ for o in objects:
     # If we've already extracted a spectrum of this object, use the first extraction
     #  as a reference or apfile reference (accounting for differences in blue and red pixel scales).
     try:
-        reference = extracted_images[ extracted_objects.index( o[3] ) ]
+        reference = extracted_images[ extracted_objects.index( o[4] ) ]
         if 'blue' in reference:
             # go ahead and simply use as a reference
             su.extract( b, 'blue', reference=reference )
@@ -119,7 +119,7 @@ for o in objects:
             raise StandardError( 'We have a situation with aperature referencing.' )
     except ValueError:
         su.extract( b, 'blue' )
-    extracted_objects.append( o[3] )
+    extracted_objects.append( o[4] )
     extracted_images.append( b )
 
 
