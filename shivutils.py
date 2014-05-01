@@ -56,11 +56,13 @@ BLUEBIAS2='[2082:2110,*]'
 BLUETRIM1='[1:1024,%d:%d]'
 BLUETRIM2='[1025:2048,%d:%d]'
 BLUEGAIN1=1.2
-BLUEGAIN1=1.237
+BLUEGAIN2=1.237
 BLUERDNOISE=3.7
 
+HOMEDIR='/indirect/big_scr5/ishivvers/kastreductions/TheKastShiv/'
 # location of line id list
-COORDLIST='/indirect/big_scr5/ishivvers/kastreductions/TheKastShiv/licklinelist.dat'
+COORDLIST=HOMEDIR+'tools/licklinelist.dat'
+LOGINCL=HOMEDIR='tools/login.cl'
 
 # useful for iraf interactions
 yes=iraf.yes
@@ -80,6 +82,7 @@ def make_file_system( runID ):
     os.chdir('uc')
     os.mkdir('rawdata')
     os.mkdir('working')
+    run_cmd('cp %s working/.' %LOGINCL)
     os.mkdir('final')
     os.chdir('..')
 
@@ -454,7 +457,7 @@ def update_headers(images):
     run uvfixhead (custom IRAF task) and calculate the airmass values
     """
     images = ','.join(images)
-    iraf.uvfixhead(images)
+    iraf.kastfixhead(images)
     iraf.setairmass(images)
 
 ############################################################################
@@ -616,6 +619,27 @@ def clean_cosmics( fitspath, cleanpath, side, maskpath=None ):
     if maskpath != None:
         cr.tofits(maskpath, c.mask, header)
     return
+
+
+######################################################################
+# standards management
+######################################################################
+
+def id_standard( obj_name ):
+    """
+    Matches obj_name (a string) to known red and blue standards.
+    Calibration files for all of the standards below must exist in 
+     the calibration directory.
+    """
+    standards = [('feige34', 2), ('feige110', 2), ('hz44', 2), 
+                 ('bd284211', 2), ('g191b2b', 2), 
+                 ('bd262606', 1), ('hd84937',1 ), ('hd19445', 1)]
+
+    # cleanup the input object name
+    obj_name = obj_name.lower().replace(' ','')
+    # 
+
+
 
 ######################################################################
 # automation tools

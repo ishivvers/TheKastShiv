@@ -95,7 +95,7 @@ reds = ["fb%sred%.3d.fits"%(runID,f[0]) for f in objects if f[1]==2]
 for r in reds:
     su.clean_cosmics( r, "c%s"%r, 'red', maskpath='mc%s'%r )
 
-# extract all red objects on the first path
+# extract all red objects on the first pass
 extracted_objects = []  #used to keep track of multiple observations of the same object
 extracted_images = []
 for o in objects:
@@ -111,7 +111,7 @@ for o in objects:
         su.extract( r, 'red' )
     extracted_objects.append( o[3] )
     extracted_images.append( r )
-# extract all blue objects on the first path
+# extract all blue objects on the second pass
 for o in objects:
     if o[1] != 1:
         continue
