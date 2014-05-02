@@ -81,7 +81,7 @@ for b in blues:
     su.clean_cosmics( b, "c%s"%b, 'blue' )
 reds = ["fb%sred%.3d.fits"%(runID,f[0]) for f in objects if f[1]==2]
 for r in reds:
-    su.clean_cosmics( r, "c%s"%r, 'red', maskpath='mc%s'%r )
+    su.clean_cosmics( r, "c%s"%r, 'red' )
 
 # extract all red objects on the first pass
 extracted_objects = []  #used to keep track of multiple observations of the same object
@@ -94,6 +94,7 @@ for o in objects:
     #  as a reference.
     try:
         reference = extracted_images[ extracted_objects.index( o[4] ) ]
+        print 'using',reference,'for reference on',o[4]
         su.extract( r, 'red', reference=reference )
     except ValueError:
         su.extract( r, 'red' )
@@ -108,6 +109,7 @@ for o in objects:
     #  as a reference or apfile reference (accounting for differences in blue and red pixel scales).
     try:
         reference = extracted_images[ extracted_objects.index( o[4] ) ]
+        print '\n\nusing',reference,'for reference on',o[4],'\n'
         if 'blue' in reference:
             # go ahead and simply use as a reference
             su.extract( b, 'blue', reference=reference )
@@ -127,6 +129,7 @@ for o in objects:
 ## replacing arcs.cl ##
 # extract the blue arc from the beginning of the night
 bluearc = ["fb%sblue%.3d.fits"%(runID, f[0]) for f in arcs if f[1]==1][0]
+blues = ["cfb%sblue%.3d.fits"%(runID,f[0]) for f in objects if f[1]==1]
 su.extract( bluearc, 'blue', arc=True, reference=blues[0] )
 
 # extract the red arcs, using each associated object as a reference
