@@ -1,4 +1,4 @@
-procedure fixhead (images)
+procedure kastfixhead (images)
 
 # kastfixhead.cl
 #
@@ -32,7 +32,7 @@ procedure fixhead (images)
 
 		    hedit(img,"OBSERVAT","lick",add+,del-,ver-,show+,upd+)
 	        hedit(img,"DISPAXIS",1,add+,del-,ver-,show+,upd+)
-	        asthedit(img,'/o/ishivvers/kastreductions/TheKastShiv/tools/cmds.asthedit',upd+,verbose+,oldstyl-)
+	        asthedit(img,'/home/isaac/Working/code/kast_reductions/tools/cmds.asthedit',upd+,verbose+,oldstyl-)
 		    optpa(img)
 		}
 	

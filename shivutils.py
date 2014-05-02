@@ -45,14 +45,10 @@ import credentials
 ######################################################################
 
 # kast parameters
-REDBIAS='[1201:1231,*]'
-REDTRIM='[1:1200,%d:%d]'
 REDGAIN=3.0
 REDRDNOISE=12.5
 BLUEBIAS1='[2052:2080,*]'
 BLUEBIAS2='[2082:2110,*]'
-BLUETRIM1='[1:1024,%d:%d]'
-BLUETRIM2='[1025:2048,%d:%d]'
 BLUEGAIN1=1.2
 BLUEGAIN2=1.237
 BLUERDNOISE=3.7
@@ -369,14 +365,13 @@ def bias_correct(images, y1, y2, prefix=None):
         naxis1 = fits.header['NAXIS1'] #number of columns total
         side = fits.header['VERSION']
         
+        bbuf = 2 # buffer size to trim from bias section to account for stray light
         if side == 'kastr':
-            # pull out and average the overscan/bias section
-            # assume the highest-numbered columns are the overscan region
-            bias = np.mean( fits.data[y1:y2, -cover:], 1 )
+            # pull out and average the overscan/bias section,
+            #  letting there be a small buffer for stray light
+            bias = np.mean( fits.data[y1:y2, -(cover-bbuf):], 1 )
             # get the trimmed section
             trimmed_data = fits.data[y1:y2, :-cover]
-            # NOTE: KASTBIAS.PRO subtracts a few more pixels from either side
-            #  than I do here
             # apply the bias correction per row
             corrected_data = np.zeros_like(trimmed_data)
             for row in range(trimmed_data.shape[0]):
@@ -384,9 +379,9 @@ def bias_correct(images, y1, y2, prefix=None):
         
         elif side == 'kastb':
             # pull out and average the two different overscan/bias sections
-            #  (one for each amplifier)
-            bias1 = np.mean( fits.data[y1:y2,-cover*2:-cover], 1 )
-            bias2 = np.mean( fits.data[y1:y2,-cover], 1 )
+            #  (one for each amplifier). use a small buffer to account for any stray light
+            bias1 = np.mean( fits.data[y1:y2,-(cover*2-bbuf):-cover], 1 )
+            bias2 = np.mean( fits.data[y1:y2,-cover:], 1 )
             # the midpoint dividing the two amplifiers; SLIGHTLY DIFFERENT THAN KASTBIAS.PRO!!
             mid = (naxis1 - 2*cover)/2
             # get the trimmed sections for each amplifier
@@ -401,9 +396,6 @@ def bias_correct(images, y1, y2, prefix=None):
                 corrected_data2[row,:] = (trimmed_data2[row,:] - bias2[row]) * BLUEGAIN2
             # join the two sides back together
             corrected_data = np.hstack( (corrected_data1, corrected_data2) )
-        
-        # cut any noisy bits below 0
-        corrected_data[ correctec_data<0 ] = 0
         
         # remove the DATASEC keyheader keywork if it exists
         try:
@@ -438,6 +430,8 @@ def bias_correct_iraf(images, y1, y2, prefix=None):
           each amplifier independently, but it looks like ccdproc does
           not do this.  If important, will need to hardcode own version
           of kast_bias.pro.
+
+    SOMETHING IS WRONG; SHOULD NEVER HAVE VALUES <= 0.0 !!!
     '''
     if type(images) != list:
         images = [images]

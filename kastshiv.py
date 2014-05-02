@@ -6,6 +6,7 @@ The Kast Shiv: a Kast spectrocscopic reduction pipeline
 
 Notes:
  - currently seems to be working!
+ - requires login.cl in the starting folder (hard code that in! can chdir, then import, then chdir back)
  - next steps:
   - incorporate cal.pro
   - wrap as steps with a logger
@@ -44,11 +45,11 @@ r_y1, r_y2 = su.find_trim_sec( firstredflat )
 
 # bias correct all blue images
 allblues = ["%sblue%.3d.fits"%(runID,f[0]) for f in objects+flats+arcs if f[1]==1]
-su.bias_correct_idl( allblues, b_y1, b_y2 )
+su.bias_correct( allblues, b_y1, b_y2 )
 
 # bias correct all red images
 allreds = ["%sred%.3d.fits"%(runID,f[0]) for f in objects+flats+arcs if f[1]==2]
-su.bias_correct_idl( allreds, r_y1, r_y2 )
+su.bias_correct( allreds, r_y1, r_y2 )
 
 
 ## replacing startred.cl ##
@@ -70,7 +71,7 @@ for i in allgroups:
     redflats = ["b%sred%.3d.fits" %(runID, f[0]) for f in flats if f[2]==i]
     if len(redflats) == 0: continue
     su.make_flat( redflats, 'nflat%d'%i, 'red' )
-    reds = ["b%sred%.3d.fits"%(runID,f[0]) for f in objects+arcs if f[1]==i]
+    reds = ["b%sred%.3d.fits"%(runID,f[0]) for f in objects+arcs if f[2]==i]
     if len(reds) == 0: continue
     su.apply_flat( reds, 'nflat%d'%i )
 

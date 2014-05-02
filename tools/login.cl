@@ -4,7 +4,7 @@
 if (defpar ("logver"))
     logver = "IRAF V2.11 May 1997"
 
-set	home		= "home/isaac/Working/code/kast_reductions/tools/"
+set	home		= "/home/isaac/Working/code/kast_reductions/tools/"
 set	imdir		= "HDR$"
 set	uparm		= "home$uparm/"
 set	userid		= "ishivvers"
@@ -93,9 +93,6 @@ imred
 ccdred
 kpnoslit
 astutil
-ucsclris
-prep
-deimos
 
 keep
 
