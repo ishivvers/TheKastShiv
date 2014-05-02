@@ -353,10 +353,73 @@ def get_object_names( obj_files ):
 # bias, flatfielding, header updates
 ############################################################################
 
+def bias_correct(images, y1, y2, prefix=None):
+    """
+    Bias correct and trim a set of images with y trim limits
+     of y1, y2.
+    """
+    if prefix==None:
+        prefix = 'b'
+    
+    for image in images:
+        # open file and get parameters
+        fits = pf.open( image )[0]
+        
+        cover = fits.header['COVER']    #number of overscan columns
+        naxis1 = fits.header['NAXIS1'] #number of columns total
+        side = fits.header['VERSION']
+        
+        if side == 'kastr':
+            # pull out and average the overscan/bias section
+            # assume the highest-numbered columns are the overscan region
+            bias = np.mean( fits.data[y1:y2, -cover:], 1 )
+            # get the trimmed section
+            trimmed_data = fits.data[y1:y2, :-cover]
+            # NOTE: KASTBIAS.PRO subtracts a few more pixels from either side
+            #  than I do here
+            # apply the bias correction per row
+            corrected_data = np.zeros_like(trimmed_data)
+            for row in range(trimmed_data.shape[0]):
+                corrected_data[row,:] = (trimmed_data[row,:] - bias[row]) * REDGAIN
+        
+        elif side == 'kastb':
+            # pull out and average the two different overscan/bias sections
+            #  (one for each amplifier)
+            bias1 = np.mean( fits.data[y1:y2,-cover*2:-cover], 1 )
+            bias2 = np.mean( fits.data[y1:y2,-cover], 1 )
+            # the midpoint dividing the two amplifiers; SLIGHTLY DIFFERENT THAN KASTBIAS.PRO!!
+            mid = (naxis1 - 2*cover)/2
+            # get the trimmed sections for each amplifier
+            trimmed_data1 = fits.data[y1:y2, :mid]
+            trimmed_data2 = fits.data[y1:y2, mid:-cover*2]
+            # apply the bias correction
+            corrected_data1 = np.zeros_like(trimmed_data1)
+            for row in range(trimmed_data1.shape[0]):
+                corrected_data1[row,:] = (trimmed_data1[row,:] - bias1[row]) * BLUEGAIN1
+            corrected_data2 = np.zeros_like(trimmed_data2)
+            for row in range(trimmed_data2.shape[0]):
+                corrected_data2[row,:] = (trimmed_data2[row,:] - bias2[row]) * BLUEGAIN2
+            # join the two sides back together
+            corrected_data = np.hstack( (corrected_data1, corrected_data2) )
+        
+        # cut any noisy bits below 0
+        corrected_data[ correctec_data<0 ] = 0
+        
+        # remove the DATASEC keyheader keywork if it exists
+        try:
+            fits.header.pop('DATASEC')
+        except KeyError:
+            pass
+        
+        # write to file
+        pf.writeto( prefix+image, corrected_data, fits.header )
+
+############################################################################
+
 def bias_correct_idl(images, y1, y2, prefix=None, idlpath=IDLPATH):
     """
     Use pIDLy to interact with the trusty 'kastbias.pro' script
-     to bias correct a set of images with y trim limits of y1, y2.
+     to bias correct and trim a set of images with y trim limits of y1, y2.
     NOTE: your IDL installation must know the location of 'kastbias.pro'
     """
     if prefix==None:
@@ -368,7 +431,7 @@ def bias_correct_idl(images, y1, y2, prefix=None, idlpath=IDLPATH):
 
 ############################################################################
 
-def bias_correct(images, y1, y2, prefix=None):
+def bias_correct_iraf(images, y1, y2, prefix=None):
     '''
     Bias correct a set of images with y trim limits of y1, y2.
     NOTE: the original kast_bias.pro script incorporates the "gain" of
