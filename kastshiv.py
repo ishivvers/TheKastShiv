@@ -27,8 +27,29 @@ class Shiv(object):
     
     def __init__(self, runID=runID, interactive=True):
         self.runID = runID
-        self.interactive=True  #STILL NEEDS TO BE IMPLEMENTED
+        self.interactive = True  #STILL NEEDS TO BE IMPLEMENTED
+        self.steps = [self.build_fs,
+                      self.get_data,
+                      self.find_trim_sections,
+                      self.trim_and_bias_correct,
+                      self.update_headers,
+                      self.make_flats,
+                      self.apply_flats,
+                      self.reject_cosmic_rays,
+                      self.extract_object_spectra,
+                      self.extract_arc_spectra,
+                      self.id_arcs,
+                      self.apply_wavelength,
+                      self.flux_calibrate]
+        self.current_step = 0
+
+    def __iter__(self):
+        return self
     
+    def next(self):
+        self.steps[ self.current_step ]()
+        self.current_step += 1
+
     def build_fs(self):
         """Create the file system hierarchy and enter it."""
         su.make_file_system( self.runID )
