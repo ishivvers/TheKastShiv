@@ -366,12 +366,13 @@ def bias_correct(images, y1, y2, prefix=None):
         side = fits.header['VERSION']
         
         bbuf = 2 # buffer size to trim from bias section to account for stray light
+        dbuf = 2 # buffer size to trim from data section (in x dimension)
         if side == 'kastr':
             # pull out and average the overscan/bias section,
             #  letting there be a small buffer for stray light
             bias = np.mean( fits.data[y1:y2, -(cover-bbuf):], 1 )
             # get the trimmed section
-            trimmed_data = fits.data[y1:y2, :-cover]
+            trimmed_data = fits.data[y1:y2, dbuf:-(cover+dbuf)]
             # apply the bias correction per row
             corrected_data = np.zeros_like(trimmed_data)
             for row in range(trimmed_data.shape[0]):
@@ -385,8 +386,8 @@ def bias_correct(images, y1, y2, prefix=None):
             # the midpoint dividing the two amplifiers; SLIGHTLY DIFFERENT THAN KASTBIAS.PRO!!
             mid = (naxis1 - 2*cover)/2
             # get the trimmed sections for each amplifier
-            trimmed_data1 = fits.data[y1:y2, :mid]
-            trimmed_data2 = fits.data[y1:y2, mid:-cover*2]
+            trimmed_data1 = fits.data[y1:y2, dbuf:mid]
+            trimmed_data2 = fits.data[y1:y2, mid:-(cover*2+dbuf)]
             # apply the bias correction
             corrected_data1 = np.zeros_like(trimmed_data1)
             for row in range(trimmed_data1.shape[0]):
@@ -595,7 +596,7 @@ def parse_apfile( apfile ):
     Returns a tuple of (lo, hi) for aperture, low background, and high background, in that order
      e.g.: aperture, lo_bg, hi_bg = parse_apfile( apfile )
     """
-    s = open(apfile,'r').read()
+    lines = open(apfile,'r').readlines()
     lo = float([l for l in lines if 'low' in l][0].split(' ')[-1].strip())
     hi = float([l for l in lines if 'high' in l][0].split(' ')[-1].strip())
     sampline = [l for l in lines if 'sample' in l][0]
@@ -662,7 +663,7 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None,
                    readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
                    ulimit=20, ylevel=0.01, t_function="legendre", t_order=4,
                    lower=ap[0]*apfact, upper=ap[1]*apfact,
-                   b_sample="%.2f:%.2f,%.2f::.2f" %(lbg[0]*apfact, lbg[1]*apfact, rbg[0]*apfact, rbg[1]*apfact) )
+                   b_sample="%.2f:%.2f,%.2f:%.2f" %(lbg[0]*apfact, lbg[1]*apfact, rbg[0]*apfact, rbg[1]*apfact) )
     else:
         raise StandardError( "unacceptable keyword combination" )
 
@@ -725,10 +726,11 @@ def id_standard( obj_name ):
     
     # get the best match
     try:
-        std_name = get_close_matches( a, standards, 1 )[0]
+        std_name = get_close_matches( obj_name, standards, 1 )[0]
     except IndexError:
+        print 'no match for',obj_name
         return None
-    
+    print 'identified',obj_name,'as',std_name
     return std_name, standards[std_name]
 
 ######################################################################
@@ -745,42 +747,69 @@ def match_science_and_standards( allobjects ):
     blue_outdict = {}
     red_outdict = {}
     
-    # first get all of the standards
+    # first get all of the blue standards
     airmasses = []
     std_names = []
     for fname in allobjects:
-        objname = head_get( fname, 'OBJECT' )
-        std_id = id_standard( abjname )
+        if 'blue' not in fname:
+            continue
+        objname = head_get( fname, 'OBJECT' )[0]
+        std_id = id_standard( objname )
         if std_id == None:
             continue
         
-        outdict[ fname ] = []
         std_names.append( fname )
-        airmasses.append( head_get( fname, 'AIRMASS' ) )
-        if (std_id[1] == 1) and 'red' in fname:
-            red_outdict[ fname ] = []
-        elif (std_id[1] == 2) and 'blue' in fname:
-            blue_outdict[ fname ] = []
+        airmasses.append( head_get( fname, 'AIRMASS' )[0] )
+        if (std_id[1] == 1):
+            blue_outdict[ fname ] = [] 
         else:
             raise StandardError( "attempting to use a standard on the wrong side!" )
     
     airmasses = np.array(airmasses)
-    # now associate each science obs with a standard
+    # now associate each blue science obs with a standard
     for fname in allobjects:
-        objname = head_get( fname, 'OBJECT' )
+        if 'blue' not in fname:
+            continue
+        objname = head_get( fname, 'OBJECT' )[0]
         std_id = id_standard( objname )
         if std_id != None:
             continue
-        am = head_get( fname, 'AIRMASS' )
+        am = head_get( fname, 'AIRMASS' )[0]
         std_match = std_names[ np.argmin(np.abs(am-airmasses)) ]
-        if 'red' in fname:
-            red_outdict[ std_match ].append( fname )
-        elif 'blue' in fname:
-            blue_outdict[ std_match ].append( fname )
-        else:
-            raise StandardError('augghh! whose side am I on!?!?')
+        blue_outdict[ std_match ].append( fname )
+ 
+    # now get all of the red standards
+    airmasses = []
+    std_names = []
+    for fname in allobjects:
+        if 'red' not in fname:
+            continue
+        objname = head_get( fname, 'OBJECT' )[0]
+        std_id = id_standard( objname )
+        if std_id == None:
+            continue
         
-        return blue_outdict, red_outdict
+        std_names.append( fname )
+        airmasses.append( head_get( fname, 'AIRMASS' )[0] )
+        if (std_id[1] == 2):
+            red_outdict[ fname ] = []
+        else:
+            raise StandardError( "attempting to use a standard on the wrong side!" )
+    
+    airmasses = np.array(airmasses)
+    # now associate each red science obs with a standard
+    for fname in allobjects:
+        if 'red' not in fname:
+            continue
+        objname = head_get( fname, 'OBJECT' )[0]
+        std_id = id_standard( objname )
+        if std_id != None:
+            continue
+        am = head_get( fname, 'AIRMASS' )[0]
+        std_match = std_names[ np.argmin(np.abs(am-airmasses)) ]
+        red_outdict[ std_match ].append( fname )
+               
+    return blue_outdict, red_outdict
 
 ######################################################################
 
@@ -800,11 +829,11 @@ def calibrate_idl( input_dict, idlpath=IDLPATH, cleanup=True ):
         
         # give the user some feedback
         print '\n\nStarting IDL & cal.pro'
+        print 'Standard file:',std
         print 'Input file: cal.input'
+        print 'Type "cal"'
         
-        idl = IDL( idlpath )
-        idl.pro("cal")
-        idl.close()
+        start_idl()
 
 ######################################################################
 # automation tools
