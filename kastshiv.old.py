@@ -5,71 +5,51 @@ The Kast Shiv: a Kast spectrocscopic reduction pipeline
 
 
 Notes:
+ - currently seems to be working!
+ - requires login.cl in the starting folder (hard code that in! can chdir, then import, then chdir back)
+ - next steps:
+  - incorporate cal.pro
   - wrap as steps with a logger
    - plan: have a class, which has a set of persistent
            variables, which say where in the pipeline you are
            and if you want to skip any steps, etc.
-   - class should be iterable, to just run steps in order
-   - should be able to start/stop at any point
-   - should be able to stop and adjust parameters then go again
 """
 
 import shivutils as su
 import os
 from glob import glob
 
-class Shiv(object):
-    """
-    The Kast Shiv: a Kast spectrocscopic reduction pipeline
-     written by I.Shivvers (modified from the K.Clubb/J.Silverman/T.Matheson
-     pipeline and the B.Cenko pipeline - thanks everyone).
-    """
-    
-    def __init__(self, runID=runID):
-        self.runID = runID
-        pass
-    
-    def build_fs(self):
-        """Create the file system hierarchy and enter it."""
-        su.make_file_system( self.runID )
-        os.chdir( self.runID )
+# setup the file hierarchy, download the data, and move it around
+runID = 'uc'
+dateUT = '2013/5/17'
+datePT = '2013/5/16'
 
-    def get_data(self, dateUT, datePT):
-        """
-        Download data and populate relevant folders.
-        Should be run from root folder, and leaves you in working folder.
-        """
-        os.chdir( 'rawdata' )
-        su.get_kast_data( datePT )
-        os.chdir( '../working' )
-        self.objects, self.flats, self.arcs = su.wiki2elog( datestring=dateUT, runID=self.runID, outfile='%s.log'%self.runID  )
-        su.populate_working_dir( 'uc', logfile='%s.log'%self.runID )
-    
-    def find_trim_sections(self):
-        """
-        Determine the optimal trim sections for each side.
-        """
-        obj_files = ["%sblue%.3d.fits" for o in self.objects if o[1]==1 +\
-                    ["%sred%.3d.fits" for o in self.objects if o[1]==2]
-        # find the trim sections for the red and blue images,
-        #  using the first red and blue flats
-        firstblueflat = "%sblue%.3d.fits" %(self.runID, [f[0] for f in self.flats if f[1]==1][0])
-        self.b_ytrim = su.find_trim_sec( firstblueflat )
+su.make_file_system( runID )
+os.chdir( 'uc/rawdata' )
+su.get_kast_data( datePT )
+os.chdir( '../working' )
+objects, arcs, flats = su.wiki2elog( datestring=dateUT, runID=runID, outfile='%s.log'%runID  )
+su.populate_working_dir( 'uc', logfile='%s.log'%runID )
 
-        firstredflat = "%sred%.3d.fits" %(self.runID, [f[0] for f in self.flats if f[1]==2][0])
-        self.r_ytrim = su.find_trim_sec( firstredflat )
 
-    def trim_and_bias_correct(self):
-        """
-        Trims and bias corrects all images.
-        """
-        # bias correct all blue images
-        allblues = ["%sblue%.3d.fits"%(runID,f[0]) for f in self.objects+self.flats+self.arcs if f[1]==1]
-        su.bias_correct_idl( allblues, self.b_ytrim[0], self.b_ytrim[1] )
+obj_files = ["%sblue%.3d.fits" for o in objects if o[1]==1] +\
+            ["%sred%.3d.fits" for o in objects if o[1]==2]
+# find the trim sections for the red and blue images,
+#  using the first red and blue flats
+firstblueflat = "%sblue%.3d.fits" %(runID, [f[0] for f in flats if f[1]==1][0])
+b_y1, b_y2 = su.find_trim_sec( firstblueflat )
 
-        # bias correct all red images
-        allreds = ["%sred%.3d.fits"%(runID,f[0]) for f in self.objects+self.flats+self.arcs if f[1]==2]
-        su.bias_correct_idl( allreds, self.r_ytrim[0], self.r_ytrim[1] )
+firstredflat = "%sred%.3d.fits" %(runID, [f[0] for f in flats if f[1]==2][0])
+r_y1, r_y2 = su.find_trim_sec( firstredflat )
+
+
+# bias correct all blue images
+allblues = ["%sblue%.3d.fits"%(runID,f[0]) for f in objects+flats+arcs if f[1]==1]
+su.bias_correct( allblues, b_y1, b_y2 )
+
+# bias correct all red images
+allreds = ["%sred%.3d.fits"%(runID,f[0]) for f in objects+flats+arcs if f[1]==2]
+su.bias_correct( allreds, r_y1, r_y2 )
 
 
 ## replacing startred.cl ##
@@ -91,7 +71,7 @@ for i in allgroups:
     redflats = ["b%sred%.3d.fits" %(runID, f[0]) for f in flats if f[2]==i]
     if len(redflats) == 0: continue
     su.make_flat( redflats, 'nflat%d'%i, 'red' )
-    reds = ["b%sred%.3d.fits"%(runID,f[0]) for f in objects+arcs if f[1]==i]
+    reds = ["b%sred%.3d.fits"%(runID,f[0]) for f in objects+arcs if f[2]==i]
     if len(reds) == 0: continue
     su.apply_flat( reds, 'nflat%d'%i )
 
@@ -101,7 +81,7 @@ for b in blues:
     su.clean_cosmics( b, "c%s"%b, 'blue' )
 reds = ["fb%sred%.3d.fits"%(runID,f[0]) for f in objects if f[1]==2]
 for r in reds:
-    su.clean_cosmics( r, "c%s"%r, 'red', maskpath='mc%s'%r )
+    su.clean_cosmics( r, "c%s"%r, 'red' )
 
 # extract all red objects on the first pass
 extracted_objects = []  #used to keep track of multiple observations of the same object
@@ -113,11 +93,12 @@ for o in objects:
     # If we've already extracted a spectrum of this object, use the first extraction
     #  as a reference.
     try:
-        reference = extracted_images[ extracted_objects.index( o[3] ) ]
+        reference = extracted_images[ extracted_objects.index( o[4] ) ]
+        print 'using',reference,'for reference on',o[4]
         su.extract( r, 'red', reference=reference )
     except ValueError:
         su.extract( r, 'red' )
-    extracted_objects.append( o[3] )
+    extracted_objects.append( o[4] )
     extracted_images.append( r )
 # extract all blue objects on the second pass
 for o in objects:
@@ -127,7 +108,8 @@ for o in objects:
     # If we've already extracted a spectrum of this object, use the first extraction
     #  as a reference or apfile reference (accounting for differences in blue and red pixel scales).
     try:
-        reference = extracted_images[ extracted_objects.index( o[3] ) ]
+        reference = extracted_images[ extracted_objects.index( o[4] ) ]
+        print '\n\nusing',reference,'for reference on',o[4],'\n'
         if 'blue' in reference:
             # go ahead and simply use as a reference
             su.extract( b, 'blue', reference=reference )
@@ -140,13 +122,14 @@ for o in objects:
             raise StandardError( 'We have a situation with aperature referencing.' )
     except ValueError:
         su.extract( b, 'blue' )
-    extracted_objects.append( o[3] )
+    extracted_objects.append( o[4] )
     extracted_images.append( b )
 
 
 ## replacing arcs.cl ##
 # extract the blue arc from the beginning of the night
 bluearc = ["fb%sblue%.3d.fits"%(runID, f[0]) for f in arcs if f[1]==1][0]
+blues = ["cfb%sblue%.3d.fits"%(runID,f[0]) for f in objects if f[1]==1]
 su.extract( bluearc, 'blue', arc=True, reference=blues[0] )
 
 # extract the red arcs, using each associated object as a reference
@@ -165,7 +148,7 @@ R1R2 = ["fb%sred%.3d.ms.fits"%(runID, f[0]) for f in arcs if f[2]==2][:2]
 su.combine_arcs( R1R2, 'Combined_0.5_Arc.ms.fits' )
 su.id_arc( 'Combined_0.5_Arc.ms.fits' )
 
-# ID the first object arc interactively, making sure
+# ID the first red object arc interactively, making sure
 #  we handle the 0.5" arcs properly
 firstobjarc = ["fb%sred%.3d.ms.fits"%(runID, f[0]) for f in arcs if f[2]==2][2]
 su.reid_arc( firstobjarc, 'Combined_0.5_Arc.ms.fits')

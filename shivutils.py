@@ -671,15 +671,19 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None,
 # cosmic ray removal
 ############################################################################
 
-def clean_cosmics( fitspath, cleanpath, side, maskpath=None ):
+def clean_cosmics( fitspath, side, cleanpath=None, maskpath=None ):
     """
      clean an input fits file using the LACOS algorithm 
     
     - fitspath: input file
-    - cleanpath: output file
     - side: one of 'blue','red'
+    - cleanpath: output file (if none, prepends "c" to input filename)
     - maskpath: [optional] mask output file
     """
+    if cleanpath == None:
+        # this only works if we are in the same folder
+        assert('/' not in fitspath)
+        cleanpath = 'c' + fitspath
     # lacos parameters
     objlim = 5.0
     maxiter = 3
