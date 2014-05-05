@@ -25,7 +25,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pyfits as pf
 from pidly import IDL
-from pyraf import iraf
 from glob import glob
 from scipy.optimize import minimize
 from dateutil import parser as date_parser
@@ -41,7 +40,7 @@ import cosmics as cr
 import credentials
 
 ######################################################################
-# global variables
+# global variables and IRAF import
 ######################################################################
 
 # kast parameters
@@ -54,7 +53,7 @@ BLUEGAIN2=1.237
 BLUERDNOISE=3.7
 
 from platform import node
-# give the path to the IDL executable
+# give the path to the IDL executable and home folders
 # and the home folder
 if node() == 'classy':
     IDLPATH='/home/isaac/Working/code/IDL/idl/bin/idl'
@@ -67,6 +66,13 @@ else:
 # location of line id list
 COORDLIST=HOMEDIR+'tools/licklinelist.dat'
 LOGINCL=HOMEDIR+'tools/login.cl'
+
+# copy over login.cl file before starting iraf
+cwd = os.path.realpath('.')
+res = os.system( 'cp %s %s/.'%(LOGINCL, cwd) )
+if res != 0:
+    raise StandardError('Cannot find IRAF login.cl file!')
+from pyraf import iraf
 
 # useful for iraf interactions
 yes=iraf.yes

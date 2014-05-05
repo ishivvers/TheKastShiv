@@ -11,7 +11,7 @@ the UREKA python/pyraf/iraf installation), and I am running
 into significant problems with the silverclubb full pipeline.
 
 
-# goals of this new code #
+### goals of this new code ###
 
 - highly automated
 - cuts no corners
@@ -19,14 +19,5 @@ into significant problems with the silverclubb full pipeline.
 - lots of documentation
 - easy to start/stop/resume at any point in the reduction
 - robust to errors
-
 - secondary: does not require IDL
 
-
-------------------------------------
-
-## to do: ##
-
-- make sure the blue side apertures are the same as the red (which we fit for)
-- incorporate and understand last (IDL) steps of silverclubb pipeline
-- wrap kastshiv and put a handle on it
