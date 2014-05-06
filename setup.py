@@ -1,8 +1,8 @@
 """
 This is a simple setup script for the Kast Shiv.
 
-This should be run once from the code's root directory
- once, before attempting to use the code.
+This should be run once from the code's root directory,
+ before attempting to use the code.
  
 This script goes into all of the files that require 
  hardcoded paths to other files, etc, and sets them
