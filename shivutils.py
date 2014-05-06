@@ -548,7 +548,7 @@ def apply_flat(images, flat, prefix='f' ):
 
 def update_headers(images):
     """
-    run uvfixhead (custom IRAF task) and calculate the airmass values
+    run fixhead (custom IRAF task) and calculate the airmass values
     """
     images = ','.join(images)
     iraf.kastfixhead(images)
@@ -589,12 +589,13 @@ def reid_arc(arc, reference, interact=True, coordlist=COORDLIST):
 
 ############################################################################
 
-def disp_correct( image, arc ):
+def disp_correct( image, arc, prefix='d' ):
     """
-    Apply the wavelength solution from arc to image, using the helper
-     task mydisp.cl
+    Apply the wavelength solution from arc to image.
     """
-    iraf.mydisp( image, arc )
+    # define the reference spectrum header in our science object
+    head_update( image, 'REFSPEC1', arc )
+    iraf.dispcor( image, prefix+image )
 
 ############################################################################
 # spectrum extraction
