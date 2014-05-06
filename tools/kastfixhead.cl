@@ -10,9 +10,7 @@ procedure kastfixhead (images)
  
 	string images {prompt="Image(s) to be fixed"}
 	struct *imglist
-	string cmds_file
-	
-	cmds_file = '/home/isaac/Working/code/kast_reductions/tools/cmds.asthedit'
+	string cmds_file = '/home/isaac/Working/code/kast_reductions/tools/cmds.asthedit'
 
 	begin
 
