@@ -1,0 +1,2 @@
+st      = mst (@'date-obs', @'ut', obsdb (observat, "longitude"))
+epoch   = epoch (@'date-obs', ut)
