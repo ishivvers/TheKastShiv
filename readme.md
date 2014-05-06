@@ -3,12 +3,8 @@
 _fast, easy, effective_
 
 
-This is an attempt to build the Isaac version of the
+This is the Isaac version of the
 Flipper group's Kast/Shane reduction pipeline.
-
-Right now, the quicklooks Cenko pipeline works well (with
-the UREKA python/pyraf/iraf installation), and I am running
-into significant problems with the silverclubb full pipeline.
 
 
 ### goals of this new code ###
@@ -35,3 +31,11 @@ You need to include the following commands in your `bash` login file (e.g., `~/.
 - path to licksky.fits in final.pro
 - path to asthedit.cmd in kastfixhead.cl
 - various paths in login.cl
+
+
+### to do ###
+
+- clean up iraf, idl routines
+- write an install script that takes template files and
+  inserts into them the proper paths for all files that require
+  modification.
