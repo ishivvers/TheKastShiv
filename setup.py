@@ -35,5 +35,5 @@ s = s.replace('replace_me:skyfilelocation', homedir+'/tools/')
 open('tools/custom_idl/final.pro','w').write(s)
 
 print '\nOk, good to go!\n'
-print 'Add the followng lines to your ~/.bashrc file and restart bash.\n'
+print 'Add the following lines to your ~/.bashrc file and restart bash.\n'
 print 'export IDL_PATH=$IDL_PATH:+%s/tools\nexport PYTHONPATH=$PYTHONPATH:%s\n' %(homedir, homedir)
