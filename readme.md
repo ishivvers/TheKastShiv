@@ -21,3 +21,17 @@ into significant problems with the silverclubb full pipeline.
 - robust to errors
 - secondary: does not require IDL
 
+
+### include path in environment variables ###
+
+You need to include the following commands in your `bash` login file (e.g., `~/.bashrc`):
+
+    export IDL_PATH=$IDL_PATH:+<KAST_SHIV_DIRECTORY>/tools
+    export PYTHONPATH=$PYTHONPATH:<KAST_SHIV_DIRECTORY>:<KAST_SHIV_DIRECTORY>/tools
+
+
+### modified files ###
+
+- path to licksky.fits in final.pro
+- path to asthedit.cmd in kastfixhead.cl
+- various paths in login.cl

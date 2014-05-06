@@ -16,6 +16,8 @@ Notes:
 import shivutils as su
 import os
 import logging
+from glob import glob
+import numpy as np
 
 class Shiv(object):
     """
@@ -24,9 +26,13 @@ class Shiv(object):
      pipeline and the B.Cenko pipeline - thanks everyone).
     """
     
-    def __init__(self, runID, interactive=True, logfile=None):
+    def __init__(self, runID, interactive=True, logfile=None,
+                 datePT=None, dateUT=None, inlog=None):
         self.runID = runID
-        self.interactive = True  #STILL NEEDS TO BE IMPLEMENTED
+        self.interactive = interactive
+        self.datePT = datePT
+        self.dateUT = dateUT
+        self.inlog = inlog
 
         # set up the logfile
         if logfile == None:
@@ -87,6 +93,28 @@ class Shiv(object):
         print '\nNext step:',self.steps[self.current_step+1].__name__
         print self.steps[self.current_step+1].__doc__
 
+    def run(self, skips=[]):
+        while True:
+            if self.current_step in skips:
+                self.skip()
+            else:
+                self.next()
+
+    def clean_start(self):
+        """
+        Deletes everything from working folder and resets to
+         the 'move_data' step.
+        Must be run from working folder.
+        """
+        assert ( os.path.basename( os.path.realpath('.') ) == 'working' )
+        try:
+            su.run_cmd('rm -r *.fits *.log database')
+        except:
+            pass
+        self.current_step = self.steps.index( self.move_data )
+        self.log.info('Clean start: reset working directory.')
+
+    ################################################################
 
     def build_fs(self):
         """
@@ -96,12 +124,14 @@ class Shiv(object):
         su.make_file_system( self.runID )
         os.chdir( self.runID )
 
-    def get_data(self, datePT):
+    def get_data(self, datePT=None):
         """
         Download data and populate relevant folders.  Requires local (Pacific) time string
          as an argument (e.g.: '2014/12/24')
         Should be run from root folder, and leaves you in working folder.
         """
+        if datePT == None:
+            datePT = self.datePT
         self.log.info('Downloading data for %s'%datePT)
         os.chdir( 'rawdata' )
         su.get_kast_data( datePT )
@@ -114,6 +144,11 @@ class Shiv(object):
          data from the wiki (using the UT date string argument).
         Must be run from working directory.
         """
+        if logfile == None:
+            logfile = self.inlog
+        if dateUT == None:
+            dateUT = self.dateUT
+
         if (logfile == None) and (dateUT != None):
             self.objects, self.arcs, self.flats = su.wiki2elog( datestring=dateUT, runID=self.runID, outfile='%s.log'%self.runID  )
             su.populate_working_dir( self.runID, logfile='%s.log'%self.runID )
@@ -154,8 +189,8 @@ class Shiv(object):
         self.log.info('Fitting for optimal trim sections')
         # find the trim sections for the red and blue images,
         #  using the first red and blue flats
-        self.b_ytrim = su.find_trim_sec( self.apf+self.broot%self.bflats[0][0] )
-        self.r_ytrim = su.find_trim_sec( self.apf+self.rroot%self.rflats[0][0] )
+        self.b_ytrim = su.find_trim_sec( self.apf+self.broot%self.bflats[0][0], plot=self.interactive )
+        self.r_ytrim = su.find_trim_sec( self.apf+self.rroot%self.rflats[0][0], plot=self.interactive )
         self.log.info( '\nBlue trim section: (%.4f, %.4f) \nRed trim section: (%.4f, %.4f)'%(self.b_ytrim[0], self.b_ytrim[1], self.r_ytrim[0], self.r_ytrim[0]) )
 
     def trim_and_bias_correct(self):
@@ -191,7 +226,7 @@ class Shiv(object):
         """
         self.log.info('Creating flats')
         blues = [self.fpf+self.broot%o[0] for o in self.bflats]
-        su.make_flat( blues, 'nflat1', 'blue' )
+        su.make_flat( blues, 'nflat1', 'blue', interactive=self.interactive )
         self.log.info( '\nCreated flat nflat1 out of the following files:\n'+',\n'.join(blues) )
 
         # go through and make the combined and normalized red flats for each object
@@ -200,7 +235,7 @@ class Shiv(object):
         for i in allgroups:
             reds = [self.fpf+self.rroot%o[0] for o in self.rflats if o[2]==i]
             if len(reds) != 0:
-                su.make_flat( reds, 'nflat%d'%i, 'red' )
+                su.make_flat( reds, 'nflat%d'%i, 'red', interactive=self.interactive )
                 self.log.info( '\nCreated flat nflat%d out of the following files:\n'%i+',\n'.join(reds) )
 
     def apply_flats(self):
@@ -257,7 +292,7 @@ class Shiv(object):
                 su.extract( fname, 'red', reference=reference )
                 self.log.info('Used ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
             except ValueError:
-                su.extract( fname, 'red' )
+                su.extract( fname, 'red', interact=self.interactive )
                 self.log.info('Extracted '+fname)
             extracted_objects.append( o[4] )
             extracted_images.append( fname )
@@ -276,12 +311,12 @@ class Shiv(object):
                     # Need to pass along apfile and conversion factor to map the red extraction
                     #  onto this blue image. Blue CCD has a plate scale 1.8558 times larger than the red.
                     apfile = 'database/ap'+reference.strip('.fits')
-                    su.extract( fname, 'blue', apfile=apfile, apfact=1.8558)
+                    su.extract( fname, 'blue', apfile=apfile, apfact=1.8558, interact=self.interactive )
                     self.log.info('Used apfiles from ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
                 else:
                     raise StandardError( 'We have a situation with aperature referencing.' )
             except ValueError:
-                su.extract( fname, 'blue' )
+                su.extract( fname, 'blue', interact=self.interactive )
             extracted_objects.append( o[4] )
             extracted_images.append( fname )
 
@@ -313,11 +348,13 @@ class Shiv(object):
         """
         self.log.info("Identifying arc lines and fitting for wavelength solutions")
         # ID the blue side arc
+        su.run_cmd( 'open %s'%su.BLUEARCIMG )
         bluearc = self.apf+self.ebroot%(self.barcs[0][0])
         su.id_arc( bluearc )
         self.log.info("Successfully ID'd "+bluearc)
 
         # sum the R1 and R2 red arcs from the beginning of the night and id the result
+        su.run_cmd( 'open %s'%su.REDARCIMG )
         R1R2 = [self.apf+self.erroot%o[0] for o in self.rarcs][:2]
         su.combine_arcs( R1R2, 'Combined_0.5_Arc.ms.fits' )
         self.log.info("Created Combined_0.5_Arc.ms.fits from "+str(R1R2))
@@ -359,6 +396,8 @@ class Shiv(object):
             su.disp_correct( self.opf+self.erroot%o[0], redarc )
             self.log.info("Applied wavelength solution from "+redarc+" to "+self.opf+self.erroot%o[0])
 
+        self.opf = 'd'+self.opf
+
     def flux_calibrate(self):
         """
         Determine and apply the relevant flux calibration to all objects.
@@ -374,8 +413,24 @@ class Shiv(object):
         for k in tmp.keys():
             self.log.info( "\nAssociated the following files with standard "+k+":\n"+',\n'.join(tmp[k]) )
 
+        os.chdir( '../final' )
         # apply flux calibrations
         su.calibrate_idl( blue_std_dict )
         self.log.info( "Applied flux calibrations to blue objects" )
         su.calibrate_idl( red_std_dict )
         self.log.info( "Applied flux calibrations to red objects" )
+
+    def run_wombat(self):
+        """
+        Simply runs wombat as needed to combine files, etc.
+        """
+        print 'wombat? wombat! WOMBAT.   BWOMBWATTTT'
+        su.start_idl()
+
+    def plt_flams(self):
+        """
+        Plot and inspect all *.flm files (the final outputs).
+        """
+        finals = glob( '*.flm' )
+        for f in finals:
+            su.plot_spectra( *np.loadtxt(f, unpack=True), title=f, savefile=f.strip('.flm')+'.png' )

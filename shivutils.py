@@ -30,6 +30,7 @@ from scipy.optimize import minimize
 from dateutil import parser as date_parser
 from BeautifulSoup import BeautifulSoup
 from difflib import get_close_matches
+from time import sleep
 import urllib
 import os
 import re
@@ -63,9 +64,11 @@ elif node() == 'beast.berkeley.edu':
     HOMEDIR='/o/ishivvers/kastreductions/TheKastShiv/'
 else:
     raise StandardError("Where am I?!")
-# location of line id list
+# location of various helpful files
 COORDLIST=HOMEDIR+'tools/licklinelist.dat'
 LOGINCL=HOMEDIR+'tools/login.cl'
+REDARCIMG=HOMEDIR+'tools/kast_arc_red.jpeg'
+BLUEARCIMG=HOMEDIR+'tools/kast_arc_blue.jpeg'
 
 # copy over login.cl file before starting iraf
 cwd = os.path.realpath('.')
@@ -490,7 +493,7 @@ def bias_correct_iraf(images, y1, y2, prefix=None):
 
 ############################################################################
 
-def make_flat(images, outflat, side, interactive=True, cleanup=True):
+def make_flat(images, outflat, side, interactive=True):
 
     '''
     Construct median flat from individual frames, and then
@@ -515,15 +518,17 @@ def make_flat(images, outflat, side, interactive=True, cleanup=True):
     
     flatimages=','.join(images)
     # combine the flats
-    iraf.flatcombine(flatimages, output='CombinedFlat', combine='median', 
+    try:
+        run_cmd( 'rm CombinedFlat.fits' )
+        sleep(1)  # have to wait a bit for this to go through!
+    except:
+        pass
+    iraf.flatcombine(flatimages, output='CombinedFlat', combine='median',
                      reject='ccdclip', ccdtype='', process=no, subsets=no,
                      delete=no, scale='median', lsigma=3.0,
                      hsigma=3.0, gain=gain, rdnoise=rdnoise)
     # fit for the response function and save as the output
     iraf.response('CombinedFlat', 'CombinedFlat', outflat, order=fitorder, interactive=interact)
-    
-    if cleanup:
-        run_cmd( 'rm CombinedFlat.fits' )
 
 ############################################################################
 
@@ -828,13 +833,15 @@ def calibrate_idl( input_dict, idlpath=IDLPATH, cleanup=True ):
     Runs the idl task cal.pro on the files given in the input_dict.
      input_dict should have standard observations for keys and lists of
      associated science observations as values.
+    Should be run from final folder, though the input images should 
+     all live in the working folder.
     """
     for std in input_dict.keys():
         # create an input file
         ftmp = open('cal.input','w')
         ftmp.write( '%s\n'%std )
         for val in input_dict[std]:
-            ftmp.write( '%s\n'%std )
+            ftmp.write( '../working/%s\n'%val )
         ftmp.close()
         
         # give the user some feedback
@@ -919,3 +926,34 @@ def find_trim_sec( flatfile, edgebuf=5, plot=True ):
 
 ######################################################################
     
+def plot_spectra(lam, flam, err=None, title=None, savefile=None):
+    '''
+    Produce pretty spectra plots.
+    
+    lam: wavelength (A expected)
+    flam: flux (ergs/cm^2/sec/A expected)
+    Both should be array-like, either 1D or 2D.
+     If given 1D arrays, will plot a single spectrum.
+     If given 2D arrays, first dimension should correspond to spectrum index.
+    title: if given, will place as the title of the plot
+    if savefile is given, will save the plot to that file.
+    '''
+        
+    spec_kwargs = dict( alpha=1., linewidth=1, c=(30./256, 60./256, 75./256) )
+    err_kwargs = dict( interpolate=True, color=(0./256, 165./256, 256./256), alpha=.1 )
+    fig = plt.figure( figsize=(14,7) )
+    ax = plt.subplot(1,1,1)
+    
+    ax.plot( lam, flam, **spec_kwargs )
+    if err != None:
+        ax.fill_between( lam, flam+err, flam-err, **err_kwargs )
+    if title != None:
+        plt.title( title )
+    
+    plt.xlabel(r'Wavelength ($\AA$)')
+    plt.ylabel('Flux')
+
+    if savefile != None:
+        plt.savefig( savefile )
+    
+    plt.show()
