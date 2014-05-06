@@ -21,19 +21,19 @@ open('shivutils.py','w').write(s)
 
 # update the login.cl file
 s = open('tools/custom_cl/login.cl.template','r').read()
-s.replace('replace_me:home', homedir+'/tools/custom_cl/')
+s = s.replace('replace_me:home', homedir+'/tools/custom_cl/')
 open('tools/custom_cl/login.cl','w').write(s)
 
 # update the kastfixhead file
 s = open('tools/custom_cl/kastfixhead.cl.template','r').read()
-s.replace('replace_me:asthedit_commands', homedir+'/tools/custom_cl/cmds.asthedit')
+s = s.replace('replace_me:asthedit_commands', homedir+'/tools/custom_cl/cmds.asthedit')
 open('tools/custom_cl/kastfixhead.cl','w').write(s)
 
 # update the final.pro file
 s = open('tools/custom_idl/final.pro.template','r').read()
-s.replace('replace_me:skyfilelocation', homedir+'/tools/')
+s = s.replace('replace_me:skyfilelocation', homedir+'/tools/')
 open('tools/custom_idl/final.pro','w').write(s)
 
-print 'Ok, good to go!'
-print 'Add the followng lines to your ~/.bashrc file and restart bash.'
-print 'export IDL_PATH=$IDL_PATH:+%s/tools\nexport PYTHONPATH=$PYTHONPATH:%s' %(homedir, homedir)
+print '\nOk, good to go!\n'
+print 'Add the followng lines to your ~/.bashrc file and restart bash.\n'
+print 'export IDL_PATH=$IDL_PATH:+%s/tools\nexport PYTHONPATH=$PYTHONPATH:%s\n' %(homedir, homedir)

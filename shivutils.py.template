@@ -53,22 +53,18 @@ BLUEGAIN1=1.2
 BLUEGAIN2=1.237
 BLUERDNOISE=3.7
 
-from platform import node
 # give the path to the IDL executable and home folders
-# and the home folder
-if node() == 'classy':
-    IDLPATH='/home/isaac/Working/code/IDL/idl/bin/idl'
-    HOMEDIR='/home/isaac/Working/code/kast_reductions/'
-elif node() == 'beast.berkeley.edu':
-    IDLPATH='/apps3/rsi/idl_8.1/bin/idl'
-    HOMEDIR='/o/ishivvers/kastreductions/TheKastShiv/'
-else:
-    raise StandardError("Where am I?!")
+## THIS PART FILLED IN BY SETUP.PY ##
+IDLPATH='replace_me:IDLPATH'
+HOMEDIR='replace_me:HOMEDIR'
+if ('replace_me' in IDLPATH) or ('replace_me' in HOMEDIR):
+    raise StandardError( 'Run setup.py before continuing!' )
+
 # location of various helpful files
-COORDLIST=HOMEDIR+'tools/licklinelist.dat'
-LOGINCL=HOMEDIR+'tools/login.cl'
-REDARCIMG=HOMEDIR+'tools/kast_arc_red.jpeg'
-BLUEARCIMG=HOMEDIR+'tools/kast_arc_blue.jpeg'
+COORDLIST=HOMEDIR+'/tools/licklinelist.dat'
+LOGINCL=HOMEDIR+'/tools/custom_cl/login.cl'
+REDARCIMG=HOMEDIR+'/tools/kast_arc_red.jpeg'
+BLUEARCIMG=HOMEDIR+'/tools/kast_arc_blue.jpeg'
 
 # copy over login.cl file before starting iraf
 cwd = os.path.realpath('.')

@@ -2,15 +2,6 @@
 The Kast Shiv: a Kast spectrocscopic reduction pipeline
  written by I.Shivvers (modified from the K.Clubb/J.Silverman/T.Matheson
  pipeline and the B.Cenko pipeline - thanks everyone).
-
-
-Notes:
-   - plan: have a class, which has a set of persistent
-           variables, which say where in the pipeline you are
-           and if you want to skip any steps, etc.
-   - class should be iterable, to just run steps in order
-   - should be able to start/stop at any point
-   - should be able to stop and adjust parameters then go again
 """
 
 import shivutils as su

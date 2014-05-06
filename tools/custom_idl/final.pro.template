@@ -30,6 +30,8 @@ pro final, inputfile, gratcode, intera
 ;  tvlct, 255*rtiny, 255*gtiny, 255*btiny
 ;  Ordered Triple to long number: COLOR = R + 256 * (G + 256 * B)
 
+skyfilelocation = 'replace_me:skyfilelocation'
+
 ;loadct, 2
 doneonceflag = 0
 if (!d.window GE 0) then begin
@@ -64,13 +66,13 @@ mskyfile = 'mastersky.fits'
 isfile = findfile(mskyfile, COUNT = count)
 if (count EQ 0) then begin
     if (bobservat EQ 'lick') then begin
-        mskyfile =  '/home/isaac/Working/code/kast_reductions/tools/licksky.fits'
+        mskyfile =  skyfilelocation + 'licksky.fits'
     endif else if (bobservat EQ 'keck') then begin
-        mskyfile = '/Users/jsilv/idl/lib/kecksky.fits'
+        mskyfile = skyfilelocation + 'kecksky.fits'
     endif else if (bobservat EQ 'sso') then begin
-        mskyfile = '/home/isaac/Working/code/kast_reductions/tools/licksky.fits'
+        mskyfile = skyfilelocation + 'licksky.fits'
     endif else if (bobservat EQ 'mcdonald') then begin
-        mskyfile = '/home/isaac/Working/code/kast_reductions/tools/licksky.fits'
+        mskyfile = skyfilelocation + 'licksky.fits'
     endif else begin
         print, 'Cannot find mastersky file and observatory unknown'
         repeat begin

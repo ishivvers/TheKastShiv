@@ -17,25 +17,36 @@ Flipper group's Kast/Shane reduction pipeline.
 - robust to errors
 - secondary: does not require IDL
 
+### run setup.py ###
+
+You will need to know the path to your IDL executable
+
+    # from KastShiv root folder
+    python setup.py
+
 
 ### include path in environment variables ###
 
 You need to include the following commands in your `bash` login file (e.g., `~/.bashrc`):
 
     export IDL_PATH=$IDL_PATH:+<KAST_SHIV_DIRECTORY>/tools
-    export PYTHONPATH=$PYTHONPATH:<KAST_SHIV_DIRECTORY>:<KAST_SHIV_DIRECTORY>/tools
+    export PYTHONPATH=$PYTHONPATH:<KAST_SHIV_DIRECTORY>
 
 
-### modified files ###
+### create the `credentials.py` file ###
 
-- path to licksky.fits in final.pro
-- path to asthedit.cmd in kastfixhead.cl
-- various paths in login.cl
+There must exists a file named `credentials.py` in the KastShiv folder, and in
+that file there must live the credentials for logging into the Kast data repository
+and the flipperwiki.  For example:
 
+    # credentials.py
+    wiki_un = 'USERNAME'
+	wiki_pw = 'PASSWORD'
+	repository_un = 'USERNAME'
+	repository_pw = 'PASSWORD'
 
 ### to do ###
 
-- clean up iraf, idl routines
 - write an install script that takes template files and
   inserts into them the proper paths for all files that require
   modification.
