@@ -334,21 +334,6 @@ def head_update( images, keywords, values, comment=None ):
             hdu[0].header.set(key, values[i], comment)
         hdu.writeto( image, clobber=True )
         hdu.close()
-
-############################################################################
-
-def get_object_names( obj_files ):
-    """
-    Opens all files in obj_files and searches for the object name in the fits header.
-    Returns a dictionary with the ID string for keys and object name as the value.
-     e.g.: {"red29":"SN2014J", "blue042":"feige34", ... }
-    """
-    outdict = {}
-    for of in obj_files:
-        idstr = re.search('blue\d+|red\d+', of).group()
-        objname = pf.open( of )[0].header["object"]
-        outdict[ idstr ] = objname
-    return outdict
     
 ############################################################################
 # bias, flatfielding, header updates
@@ -411,81 +396,6 @@ def bias_correct(images, y1, y2, prefix=None):
         
         # write to file
         pf.writeto( prefix+image, corrected_data, fits.header )
-
-############################################################################
-
-def bias_correct_idl(images, y1, y2, prefix=None, idlpath=IDLPATH):
-    """
-    Use pIDLy to interact with the trusty 'kastbias.pro' script
-     to bias correct and trim a set of images with y trim limits of y1, y2.
-    NOTE: your IDL installation must know the location of 'kastbias.pro'
-    """
-    if prefix==None:
-        prefix = 'b'
-    idl = IDL( idlpath )
-    for image in images:
-        idl.pro("kastbias",image,y1=y1,y2=y2,prefix=prefix)
-    idl.close()
-
-############################################################################
-
-def bias_correct_iraf(images, y1, y2, prefix=None):
-    '''
-    Bias correct a set of images with y trim limits of y1, y2.
-    NOTE: the original kast_bias.pro script incorporates the "gain" of
-          each amplifier independently, but it looks like ccdproc does
-          not do this.  If important, will need to hardcode own version
-          of kast_bias.pro.
-
-    SOMETHING IS WRONG; SHOULD NEVER HAVE VALUES <= 0.0 !!!
-    '''
-    if type(images) != list:
-        images = [images]
-    if prefix == None:
-        outputs = ["" for i in images]
-    else:
-        outputs = [prefix+i for i in images]
-    for i,image in enumerate(images):
-        # get whether this is red or blue side from the fits header
-        side = head_get( image, 'VERSION' )
-
-        if prefix == None:
-            outname = image
-        else:
-            outname = outputs[i]
-        
-        if side == 'kastr':
-            # use the red side parameters
-            iraf.ccdproc(image, output=outputs[i], ccdtype='', noproc=no, fixpix=no,
-                         overscan=yes,trim=yes, zerocor=no, darkcor=no, flatcor=no,
-                         illumcor=no, fringecor=no, readcor=no, scancor=no,
-                         biassec=REDBIAS, trimsec=REDTRIM%(y1,y2))
-        
-        elif side == 'kastb':
-            # need to process the two different blue amplifiers seperately
-            root,ext=os.path.splitext(image)
-            iraf.ccdproc(image, output='%s_1'%root, ccdtype='', noproc=no, fixpix=no,
-                         overscan=yes, trim=yes, zerocor=no, darkcor=no, flatcor=no,
-                         illumcor=no, fringecor=no, readcor=no, scancor=no,
-                         biassec=BLUEBIAS1, trimsec=BLUETRIM1%(y1,y2))
-            iraf.ccdproc(image, output='%s_2'%root, ccdtype='', noproc=no, fixpix=no,
-                         overscan=yes, trim=yes, zerocor=no, darkcor=no, flatcor=no,
-                         illumcor=no, fringecor=no, readcor=no, scancor=no,
-                         biassec=BLUEBIAS2, trimsec=BLUETRIM2%(y1,y2))
-            # add the results back together and clean the directory
-            iraf.imjoin('%s_1,%s_2' % (root, root), 'j%s' % image, 1)
-            run_cmd( 'rm %s_1 %s_2' % (root, root) )
-            
-            # need to manually move combined file
-            run_cmd( 'mv j%s %s' % (image, outname) )
-            
-            # not sure if needed, but update the header info to reflect the new array size
-            print 'running maybe-useless task; CHECK ME OUT'
-            head_update(outname, ['CCDSEC', 'DATASEC'],
-                        ['[1:2048,1:%d]'%(y2-y1+1), '[1:2048,1:%d]'%(y2-y1+1)])
-        
-        # add a comment saying we performed a bias subtraction
-        head_update(outname, 'BIASSUB', True, comment='Bias subtracted with IDL kastbias.pro')
 
 ############################################################################
 
@@ -610,6 +520,8 @@ def parse_apfile( apfile ):
     sampline = [l for l in lines if 'sample' in l][0]
     lbglo, lbghi, rbglo, rbghi = map(float, re.findall('-?\d+',sampline))
     return (lo,hi), (lbglo, lbghi), (rbglo, rbghi)
+
+######################################################################
 
 def extract( image, side, arc=False, output=None, interact=True, reference=None,
              apfile=None, apfact=None):
@@ -863,10 +775,14 @@ def tophat(x, low, high, left, right):
     y[ (x>left) & (x<right) ] = high
     return y
 
+######################################################################
+
 def sumsqerr(p, x, y):
     low, high, left, right = p
     return np.sum( (y - tophat(x, low, high, left, right))**2 )
     
+######################################################################
+
 def find_trim_sec( flatfile, edgebuf=5, plot=True ):
     """
     Find the optimal y-axis trim values from flatfile.
@@ -927,13 +843,12 @@ def plot_spectra(lam, flam, err=None, title=None, savefile=None):
     '''
     Produce pretty spectra plots.
     
-    lam: wavelength (A expected)
-    flam: flux (ergs/cm^2/sec/A expected)
-    Both should be array-like, either 1D or 2D.
-     If given 1D arrays, will plot a single spectrum.
-     If given 2D arrays, first dimension should correspond to spectrum index.
+    lam: wavelength
+    flam: flux
+    err: error spectrum
+     (all three must be 1d and array-like)
     title: if given, will place as the title of the plot
-    if savefile is given, will save the plot to that file.
+    savefile: if given, will save the plot to that file.
     '''
         
     spec_kwargs = dict( alpha=1., linewidth=1, c=(30./256, 60./256, 75./256) )
@@ -947,7 +862,7 @@ def plot_spectra(lam, flam, err=None, title=None, savefile=None):
     if title != None:
         plt.title( title )
     
-    plt.xlabel(r'Wavelength ($\AA$)')
+    plt.xlabel('Wavelength')
     plt.ylabel('Flux')
 
     if savefile != None:
