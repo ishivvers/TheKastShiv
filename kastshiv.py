@@ -18,12 +18,13 @@ class Shiv(object):
     """
     
     def __init__(self, runID, interactive=True, logfile=None,
-                 datePT=None, dateUT=None, inlog=None):
+                 datePT=None, dateUT=None, inlog=None, pagename=None):
         self.runID = runID
         self.interactive = interactive
         self.datePT = datePT
         self.dateUT = dateUT
         self.inlog = inlog
+        self.pagename = pagename
 
         # set up the logfile
         if logfile == None:
@@ -128,11 +129,11 @@ class Shiv(object):
         su.get_kast_data( datePT )
         os.chdir( '../working' )
 
-    def move_data(self, dateUT=None, logfile=None):
+    def move_data(self, dateUT=None, logfile=None, pagename=None):
         """
         Takes raw data and populates the working directory properly.
         If logfile is given, uses that to link fits files.  Otherwise downloads the 
-         data from the wiki (using the UT date string argument).
+         data from the wiki (using the UT date string argument or a given pagename).
         Must be run from working directory.
         """
         if logfile == None:
@@ -141,7 +142,7 @@ class Shiv(object):
             dateUT = self.dateUT
 
         if (logfile == None) and (dateUT != None):
-            self.objects, self.arcs, self.flats = su.wiki2elog( datestring=dateUT, runID=self.runID, outfile='%s.log'%self.runID  )
+            self.objects, self.arcs, self.flats = su.wiki2elog( datestring=dateUT, runID=self.runID, outfile='%s.log'%self.runID, pagename=pagename  )
             su.populate_working_dir( self.runID, logfile='%s.log'%self.runID )
         elif logfile != None:
             self.objects, self.arcs, self.flats = su.wiki2elog( datestring=dateUT, runID=self.runID, infile=logfile )

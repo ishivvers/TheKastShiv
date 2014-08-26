@@ -17,6 +17,12 @@ Flipper group's Kast/Shane reduction pipeline.
 - robust to errors
 - secondary: does not require IDL
 
+## Getting it running ##
+
+First, install the [Ureka Python/IRAF](http://ssb.stsci.edu/ureka/) system.
+Or, if you're feeling very brave, install Python, IRAF, and pyraf yourself, and get
+them to all cooperate.
+ 
 ### run setup.py ###
 
 You will need to know the path to your IDL executable
@@ -47,6 +53,3 @@ and the flipperwiki.  For example:
 
 ### to do ###
 
-- write an install script that takes template files and
-  inserts into them the proper paths for all files that require
-  modification.
