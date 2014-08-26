@@ -259,8 +259,6 @@ def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None, infile=
                 objname = cols[1].string.lower().strip()
                 for match in re.findall('[UuIi][VvRr]', objname ):
                     objname = objname.replace(match,'')
-                for match in re.findall( '\s\d\.\d"?\s', objname ):
-                    objname = objname.replace(match,'')
                 objname = objname.strip()
                 for on in obsnums:
                     objects.append( [on, sidenum, groupnum, obstype, objname])
