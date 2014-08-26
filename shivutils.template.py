@@ -463,9 +463,9 @@ def update_headers(images):
     """
     run fixhead (custom IRAF task) and calculate the airmass values
     """
-    images = ','.join(images)
-    iraf.kastfixhead(images)
-    iraf.setairmass(images)
+    for image in images:
+        iraf.kastfixhead(image)
+        iraf.setairmass(image)
 
 ############################################################################
 
