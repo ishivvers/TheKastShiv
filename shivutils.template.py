@@ -117,6 +117,9 @@ def populate_working_dir( runID, logfile=None, all_obs=None ):
         elif o[1] == 2:
             run_cmd( 'cp ../rawdata/r%d.fits %sred%.3d.fits' %(o[0],runID,o[0]) )
     
+    # change permissions
+    run_cmd( 'chmod a+rw *.fits' )
+    
 ######################################################################
 # external communications
 ######################################################################
