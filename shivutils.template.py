@@ -255,7 +255,13 @@ def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None, infile=
                 continue
             if obstype == 'obj':
                 # find the and clean up the object's name
-                objname = cols[1].string.lower().strip().strip('uv').strip('ir').strip()
+                # remove anything like a slit width or "IR/UV"
+                objname = cols[1].string.lower().strip()
+                for match in re.findall('[UuIi][VvRr]', objname ):
+                    objname = objname.replace(match,'')
+                for match in re.findall( '\s\d\.\d"?\s', objname ):
+                    objname = objname.replace(match,'')
+                objname = objname.strip()
                 for on in obsnums:
                     objects.append( [on, sidenum, groupnum, obstype, objname])
             elif obstype == 'arc':
