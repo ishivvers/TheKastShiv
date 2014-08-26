@@ -140,8 +140,10 @@ class Shiv(object):
             logfile = self.inlog
         if dateUT == None:
             dateUT = self.dateUT
+        if pagename == None:
+            pagename = self.pagename
 
-        if (logfile == None) and (dateUT != None):
+        if (logfile == None) and (dateUT != None or pagename != None):
             self.objects, self.arcs, self.flats = su.wiki2elog( datestring=dateUT, runID=self.runID, outfile='%s.log'%self.runID, pagename=pagename  )
             su.populate_working_dir( self.runID, logfile='%s.log'%self.runID )
         elif logfile != None:
