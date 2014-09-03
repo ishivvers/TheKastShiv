@@ -67,6 +67,7 @@ class Shiv(object):
             self.steps[ self.current_step ]( *args, **kwargs )
             self.current_step += 1
             self.save()
+            self.summary()
         else:
             raise StopIteration
 
