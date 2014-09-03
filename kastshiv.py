@@ -59,6 +59,9 @@ class Shiv(object):
                       self.flux_calibrate]
         self.current_step = 0
 
+        self.extracted_objects = []  #used to keep track of multiple observations of the same object
+        self.extracted_images = []
+
     def __iter__(self):
         return self
     
@@ -355,8 +358,6 @@ class Shiv(object):
         """
         self.log.info('Extracting spectra for red objects')
         # extract all red objects on the first pass
-        self.extracted_objects = []  #used to keep track of multiple observations of the same object
-        self.extracted_images = []
         for o in self.robjects:
             fname = self.opf+self.rroot%o[0]
             # If we've already extracted this exact file, move on.
@@ -368,11 +369,16 @@ class Shiv(object):
             #  as a reference.
             try:
                 reference = self.extracted_images[ self.extracted_objects.index( o[4] ) ]
-                su.extract( fname, 'red', reference=reference )
-                self.log.info('Used ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
             except ValueError:
+                reference = None
+
+            if reference == None:
                 su.extract( fname, 'red', interact=self.interactive )
                 self.log.info('Extracted '+fname)
+            else:
+                su.extract( fname, 'red', reference=reference )
+                self.log.info('Used ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
+
             self.extracted_objects.append( o[4] )
             self.extracted_images.append( fname )
             self.save()
@@ -388,6 +394,12 @@ class Shiv(object):
             #  as a reference or apfile reference (accounting for differences in blue and red pixel scales).
             try:
                 reference = self.extracted_images[ self.extracted_objects.index( o[4] ) ]
+            except ValueError:
+                reference = None
+
+            if reference == None:
+                su.extract( fname, 'blue', interact=self.interactive )
+            else:
                 if 'blue' in reference:
                     # go ahead and simply use as a reference
                     su.extract( fname, 'blue', reference=reference )
@@ -400,8 +412,6 @@ class Shiv(object):
                     self.log.info('Used apfiles from ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
                 else:
                     raise StandardError( 'We have a situation with aperature referencing.' )
-            except ValueError:
-                su.extract( fname, 'blue', interact=self.interactive )
             self.extracted_objects.append( o[4] )
             self.extracted_images.append( fname )
             self.save()
