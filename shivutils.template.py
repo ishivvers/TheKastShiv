@@ -527,7 +527,7 @@ def parse_apfile( apfile ):
     lo = float([l for l in lines if 'low' in l][0].split(' ')[-1].strip())
     hi = float([l for l in lines if 'high' in l][0].split(' ')[-1].strip())
     sampline = [l for l in lines if 'sample' in l][0]
-    lbglo, lbghi, rbglo, rbghi = map(float, re.findall('-?\d+',sampline))
+    lbglo, lbghi, rbglo, rbghi = map(float, re.findall('-?\d+\.?\d*',sampline))
     return (lo,hi), (lbglo, lbghi), (rbglo, rbghi)
 
 ######################################################################
