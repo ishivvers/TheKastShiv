@@ -2,12 +2,17 @@
 The Kast Shiv: a Kast spectrocscopic reduction pipeline
  written by I.Shivvers (modified from the K.Clubb/J.Silverman/T.Matheson
  pipeline and the B.Cenko pipeline - thanks everyone).
+
+to do: think about how to recover from savefile gracefully, and where
+ to insert automatic saves.
 """
 
 import shivutils as su
 import os
 import logging
+import pickle
 from glob import glob
+from copy import copy
 import numpy as np
 
 class Shiv(object):
@@ -17,7 +22,7 @@ class Shiv(object):
      pipeline and the B.Cenko pipeline - thanks everyone).
     """
     
-    def __init__(self, runID, interactive=True, logfile=None,
+    def __init__(self, runID, interactive=True, savefile=None, logfile=None,
                  datePT=None, dateUT=None, inlog=None, pagename=None):
         self.runID = runID
         self.interactive = interactive
@@ -25,20 +30,17 @@ class Shiv(object):
         self.dateUT = dateUT
         self.inlog = inlog
         self.pagename = pagename
+        if savefile == None:
+            self.savefile = os.path.abspath('.') + '/' + self.runID + '.sav'
+        else:
+            self.savefile = savefile
 
         # set up the logfile
         if logfile == None:
-            logfile = self.runID+'.reduction.log'
-        self.log = logging.getLogger('TheKastShiv')
-        self.log.setLevel(logging.INFO)
-        # have log messages go to screen and to file
-        fh = logging.FileHandler( logfile )
-        fh.setFormatter( logging.Formatter('%(asctime)s ::: %(message)s') )
-        self.log.addHandler(fh)
-        sh = logging.StreamHandler()
-        sh.setFormatter( logging.Formatter('*'*40+'\n%(levelname)s - %(message)s\n'+'*'*40) )
-        self.log.addHandler(sh)
-        self.log.info('Shiv Reducer started.')
+            self.logfile = os.path.abspath('.') + '/' + self.runID+'.reduction.log'
+        else:
+            self.logfile = logfile
+        self.build_log()
 
         self.steps = [self.build_fs,
                       self.get_data,
@@ -64,6 +66,7 @@ class Shiv(object):
         if self.current_step < len(self.steps):
             self.steps[ self.current_step ]( *args, **kwargs )
             self.current_step += 1
+            self.save()
         else:
             raise StopIteration
 
@@ -72,6 +75,60 @@ class Shiv(object):
         self.log.info('skipping '+self.steps[self.current_step].__name__)
         self.current_step +=1
         print 'next:',self.steps[self.current_step].__name__
+
+    def go_to_step(self, step=None):
+        """
+        Go to a specific step.  If step number is given, goes there, otherwise
+         requires interaction.
+        """
+        if type(step) == int:
+            self.current_step = step
+            self.summary()
+        else:
+            self.summary()
+            print '\nChoose one:'
+            for i,s in enumerate(self.steps):
+                print i,':::',s.__name__
+            self.current_step = int(raw_input())
+            self.summary()
+
+    def save(self):
+        """
+        Saves pickle of self variables to self.savefile.
+        """
+        vs = copy(vars(self))
+        # can't save functions or open files
+        vs.pop('steps')
+        vs.pop('log')
+        pickle.dump(vs, open(self.savefile,'w'))
+
+    def load(self, savefile=None):
+        """
+        Loads variables from pickled savefile.
+        """
+        if savefile == None:
+            savefile = self.savefile
+        vs = pickle.load( open(savefile,'r') )
+        for k in vs.keys():
+            s = 'self.%s = vs["%s"]' %(k, k)
+            exec(s)
+        self.build_log()
+        self.summary()
+
+    def build_log(self):
+        """
+        Required to start the log, or to re-establish a log after a recovery from a savefile.
+        """
+        self.log = logging.getLogger('TheKastShiv')
+        self.log.setLevel(logging.INFO)
+        # have log messages go to screen and to file
+        fh = logging.FileHandler( self.logfile )
+        fh.setFormatter( logging.Formatter('%(asctime)s ::: %(message)s') )
+        self.log.addHandler(fh)
+        sh = logging.StreamHandler()
+        sh.setFormatter( logging.Formatter('*'*40+'\n%(levelname)s - %(message)s\n'+'*'*40) )
+        self.log.addHandler(sh)
+        self.log.info('Shiv Reducer started.')
 
     def summary(self):
         """
@@ -92,19 +149,47 @@ class Shiv(object):
             else:
                 self.next()
 
-    def clean_start(self):
+    def remove_object(self, objname):
         """
-        Deletes everything from working folder and resets to
-         the 'move_data' step.
-        Must be run from working folder.
+        Will, from here on out, ignore all files associated
+         with objname.
         """
-        assert ( os.path.basename( os.path.realpath('.') ) == 'working' )
-        try:
-            su.run_cmd('rm -r *.fits *.log database')
-        except:
-            pass
-        self.current_step = self.steps.index( self.move_data )
-        self.log.info('Clean start: reset working directory.')
+        to_remove = [o for o in self.objects if o[-1]==objname]
+        # find the red group number from these
+        group = 1
+        for o in to_remove:
+            if o[1] == 2:
+                group = o[2]
+                break
+        # remove all the object files
+        for row in to_remove:
+            self.objects.remove(row)
+
+        # now remove all associated arcs and flats
+        if group != 1:
+            to_remove = [a for a in self.arcs if a[2]==group]
+            for row in to_remove:
+                self.arcs.remove(row)
+            to_remove = [f for f in self.flats if f[2]==group]
+            for row in to_remove:
+                self.flats.remove(row)
+
+        # now rebuild the side-specific lists
+        self.build_lists()
+        self.log.info('Ignoring all files associated with '+objname)
+    
+    def build_lists(self):
+        """
+        Creates the intermediate lists for objects, arcs, and flats.
+        Must be run at the beginning, and every time the self.objects/arcs/flats lists are modified.
+        """
+        # re-define the file lists
+        self.robjects = [o for o in self.objects if o[1]==2]
+        self.bobjects = [o for o in self.objects if o[1]==1]
+        self.rflats = [f for f in self.flats if f[1]==2]
+        self.bflats = [f for f in self.flats if f[1]==1]
+        self.rarcs = [a for a in self.arcs if a[1]==2]
+        self.barcs = [a for a in self.arcs if a[1]==1]
 
     ################################################################
 
@@ -159,12 +244,7 @@ class Shiv(object):
         """
         self.log.info('Populating file lists from log')
         # define the file lists
-        self.robjects = [o for o in self.objects if o[1]==2]
-        self.bobjects = [o for o in self.objects if o[1]==1]
-        self.rflats = [f for f in self.flats if f[1]==2]
-        self.bflats = [f for f in self.flats if f[1]==1]
-        self.rarcs = [a for a in self.arcs if a[1]==2]
-        self.barcs = [a for a in self.arcs if a[1]==1]
+        self.build_lists()
 
         # define the root filenames for each side
         self.rroot = '%sred'%self.runID + '%.3d.fits'        # before extraction
@@ -275,28 +355,39 @@ class Shiv(object):
         """
         self.log.info('Extracting spectra for red objects')
         # extract all red objects on the first pass
-        extracted_objects = []  #used to keep track of multiple observations of the same object
-        extracted_images = []
+        self.extracted_objects = []  #used to keep track of multiple observations of the same object
+        self.extracted_images = []
         for o in self.robjects:
             fname = self.opf+self.rroot%o[0]
+            # If we've already extracted this exact file, move on.
+            if fname in self.extracted_images:
+                print fname,'has already been extracted. Remove from self.extracted_images '+\
+                            'list if you want to run it again.'
+                continue
             # If we've already extracted a spectrum of this object, use the first extraction
             #  as a reference.
             try:
-                reference = extracted_images[ extracted_objects.index( o[4] ) ]
+                reference = self.extracted_images[ self.extracted_objects.index( o[4] ) ]
                 su.extract( fname, 'red', reference=reference )
                 self.log.info('Used ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
             except ValueError:
                 su.extract( fname, 'red', interact=self.interactive )
                 self.log.info('Extracted '+fname)
-            extracted_objects.append( o[4] )
-            extracted_images.append( fname )
+            self.extracted_objects.append( o[4] )
+            self.extracted_images.append( fname )
+            self.save()
         # extract all blue objects on the second pass
         for o in self.bobjects:
             fname = self.opf+self.broot%o[0]
+            # If we've already extracted this exact file, move on.
+            if fname in self.extracted_images:
+                print fname,'has already been extracted. Remove from self.extracted_images '+\
+                            'list if you want to run it again.'
+                continue
             # If we've already extracted a spectrum of this object, use the first extraction
             #  as a reference or apfile reference (accounting for differences in blue and red pixel scales).
             try:
-                reference = extracted_images[ extracted_objects.index( o[4] ) ]
+                reference = self.extracted_images[ self.extracted_objects.index( o[4] ) ]
                 if 'blue' in reference:
                     # go ahead and simply use as a reference
                     su.extract( fname, 'blue', reference=reference )
@@ -311,8 +402,9 @@ class Shiv(object):
                     raise StandardError( 'We have a situation with aperature referencing.' )
             except ValueError:
                 su.extract( fname, 'blue', interact=self.interactive )
-            extracted_objects.append( o[4] )
-            extracted_images.append( fname )
+            self.extracted_objects.append( o[4] )
+            self.extracted_images.append( fname )
+            self.save()
 
     def extract_arc_spectra(self):
         """

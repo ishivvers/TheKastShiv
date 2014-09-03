@@ -182,6 +182,8 @@ def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None, infile=
         # parse a local log, skip the header
         lines = open(infile,'r').readlines()[1:] 
         for l in lines:
+            if l[0] == '#':
+                continue
             try:
                 l = l.split()
                 if '-' in l[0]:
@@ -262,7 +264,7 @@ def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None, infile=
                 objname = cols[1].string.lower().strip()
                 for match in re.findall('[UuIi][VvRr]', objname ):
                     objname = objname.replace(match,'')
-                objname = objname.strip()
+                objname = objname.strip().replace(' ','_')
                 for on in obsnums:
                     objects.append( [on, sidenum, groupnum, obstype, objname])
             elif obstype == 'arc':
@@ -463,9 +465,9 @@ def update_headers(images):
     """
     run fixhead (custom IRAF task) and calculate the airmass values
     """
-    images = ','.join(images)
-    iraf.kastfixhead(images)
-    iraf.setairmass(images)
+    for image in images:
+        iraf.kastfixhead(image)
+        iraf.setairmass(image)
 
 ############################################################################
 
@@ -567,13 +569,13 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None,
                    fittrace=yes, extract=yes, extras=yes, review=yes,
                    background='fit', weights='variance', pfit='fit1d',
                    readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
-                   ulimit=20, ylevel=0.01, b_sample="-35:-25,25:35", 
+                   ulimit=20, ylevel=0.01, b_sample="-35:-25,25:35", b_order=2,
                    t_function="legendre", t_order=4 )
     elif (reference != None) & (arc == False):
         iraf.apall(image, output=output, references=reference, interactive=no,
                    find=no, recenter=no, resize=no, edit=no, trace=no,
                    fittrace=no, extract=yes, extras=yes, review=no,
-                   background='fit', readnoise=rdnoise, gain=gain )
+                   background='fit', b_order=2, readnoise=rdnoise, gain=gain )
     elif arc:
         iraf.apall(image, output=output, references=reference, interactive=no,
                    find=no, recenter=no, resize=no, edit=no, trace=no, fittrace=no,
@@ -586,7 +588,7 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None,
         iraf.apall(image, output=output, references='', interactive=interactive,
                    find=no, recenter=yes, resize=no, edit=yes, trace=yes,
                    fittrace=yes, extract=yes, extras=yes, review=yes,
-                   background='fit', weights='variance', pfit='fit1d',
+                   background='fit',  b_order=2, weights='variance', pfit='fit1d',
                    readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
                    ulimit=20, ylevel=0.01, t_function="legendre", t_order=4,
                    lower=ap[0]*apfact, upper=ap[1]*apfact,
