@@ -113,12 +113,11 @@ class Shiv(object):
         for k in vs.keys():
             s = 'self.%s = vs["%s"]' %(k, k)
             exec(s)
-        self.build_log()
         self.summary()
 
     def build_log(self):
         """
-        Required to start the log, or to re-establish a log after a recovery from a savefile.
+        Required to start the log.
         """
         self.log = logging.getLogger('TheKastShiv')
         self.log.setLevel(logging.INFO)
