@@ -139,9 +139,13 @@ def start_idl( idlpath=IDLPATH ):
     """
     start an interactive IDL session.
     """
-    session = IDL( idlpath )
-    session.interact()
-    session.close()
+    try:
+        session = IDL( idlpath )
+        session.interact()
+        session.close()
+    except OSError:
+        # idl often returns an os error if you just type 'exit'
+        return
 
 ############################################################################
 
@@ -572,9 +576,9 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None,
                    ulimit=20, ylevel=0.01, b_sample="-35:-25,25:35", b_order=2,
                    t_function="legendre", t_order=4 )
     elif (reference != None) & (arc == False):
-        iraf.apall(image, output=output, references=reference, interactive=no,
+        iraf.apall(image, output=output, references=reference, interactive=interactive,
                    find=no, recenter=no, resize=no, edit=no, trace=no,
-                   fittrace=no, extract=yes, extras=yes, review=no,
+                   fittrace=no, extract=yes, extras=yes, review=yes,
                    background='fit', b_order=2, readnoise=rdnoise, gain=gain )
     elif arc:
         iraf.apall(image, output=output, references=reference, interactive=no,
@@ -586,7 +590,7 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None,
         if apfact == None:
             apfact = 1.0
         iraf.apall(image, output=output, references='', interactive=interactive,
-                   find=no, recenter=yes, resize=no, edit=yes, trace=yes,
+                   find=no, recenter=no, resize=no, edit=no, trace=yes,
                    fittrace=yes, extract=yes, extras=yes, review=yes,
                    background='fit',  b_order=2, weights='variance', pfit='fit1d',
                    readnoise=rdnoise, gain=gain, nfind=1, apertures='1',

@@ -3,8 +3,11 @@ The Kast Shiv: a Kast spectrocscopic reduction pipeline
  written by I.Shivvers (modified from the K.Clubb/J.Silverman/T.Matheson
  pipeline and the B.Cenko pipeline - thanks everyone).
 
-to do: think about how to recover from savefile gracefully, and where
- to insert automatic saves.
+to do: 
+ - change file management at end, so finished files are moved
+    to ../final after fluxcal, and then we move to that folder
+    before running wombat
+
 """
 
 import shivutils as su
@@ -140,10 +143,17 @@ class Shiv(object):
         print '\n'+'-'*40+'\n'
         print 'Reduction state for Kast run',self.runID
         print '\n'+'-'*40+'\n'
-        print 'Current step:',self.steps[self.current_step].__name__
-        print self.steps[self.current_step].__doc__
-        print '\nNext step:',self.steps[self.current_step+1].__name__
-        print self.steps[self.current_step+1].__doc__
+        try:
+            print 'Current step:',self.steps[self.current_step].__name__
+            print self.steps[self.current_step].__doc__
+        except IndexError:
+            print 'End of reduction pipeline.'
+            return
+        try:
+            print '\nNext step:',self.steps[self.current_step+1].__name__
+            print self.steps[self.current_step+1].__doc__
+        except IndexError:
+            print 'End of reduction pipeline.'
 
     def run(self, skips=[]):
         while True:
@@ -444,13 +454,13 @@ class Shiv(object):
         """
         self.log.info("Identifying arc lines and fitting for wavelength solutions")
         # ID the blue side arc
-        su.run_cmd( 'open %s'%su.BLUEARCIMG )
+        su.run_cmd( 'gnome-open %s'%su.BLUEARCIMG, ignore_errors=True )
         bluearc = self.apf+self.ebroot%(self.barcs[0][0])
         su.id_arc( bluearc )
         self.log.info("Successfully ID'd "+bluearc)
 
         # sum the R1 and R2 red arcs from the beginning of the night and id the result
-        su.run_cmd( 'open %s'%su.REDARCIMG )
+        su.run_cmd( 'gnome-open %s'%su.REDARCIMG, ignore_errors=True )
         R1R2 = [self.apf+self.erroot%o[0] for o in self.rarcs][:2]
         su.combine_arcs( R1R2, 'Combined_0.5_Arc.ms.fits' )
         self.log.info("Created Combined_0.5_Arc.ms.fits from "+str(R1R2))
@@ -466,7 +476,7 @@ class Shiv(object):
         # now go through all other red arcs automatically
         allgroups = set([o[2] for o in self.objects])
         allgroups.remove(1)    # skip the blues
-        allgroups.remove(2)    # and the first object's arcs
+        allgroups.remove( self.robjects[0][2] )    # and the first object's arcs
         for i in allgroups:
             objarc = [self.apf+self.erroot%o[0] for o in self.rarcs if o[2]==i][0]
             su.reid_arc( objarc, firstobjarc, interact=False )
@@ -494,7 +504,7 @@ class Shiv(object):
 
         self.opf = 'd'+self.opf
 
-    def flux_calibrate(self):
+    def flux_calibrate(self, side=None):
         """
         Determine and apply the relevant flux calibration to all objects.
         """
@@ -504,17 +514,26 @@ class Shiv(object):
                      [self.opf+self.erroot%o[0] for o in self.robjects]
         blue_std_dict, red_std_dict = su.match_science_and_standards( allobjects )
 
+        # don't bother calibrating any standards that will not be used
+        for k in blue_std_dict.keys():
+            if len(blue_std_dict[k]) == 0:
+                blue_std_dict.pop(k)
+        for k in red_std_dict.keys():
+            if len(red_std_dict[k]) == 0:
+                red_std_dict.pop(k)
+
         tmp = blue_std_dict.copy()
         tmp.update(red_std_dict)
         for k in tmp.keys():
             self.log.info( "\nAssociated the following files with standard "+k+":\n"+',\n'.join(tmp[k]) )
 
-        os.chdir( '../final' )
         # apply flux calibrations
-        su.calibrate_idl( blue_std_dict )
-        self.log.info( "Applied flux calibrations to blue objects" )
-        su.calibrate_idl( red_std_dict )
-        self.log.info( "Applied flux calibrations to red objects" )
+        if side in ['blue',None]:
+            su.calibrate_idl( blue_std_dict )
+            self.log.info( "Applied flux calibrations to blue objects" )
+        if side in ['red',None]:
+            su.calibrate_idl( red_std_dict )
+            self.log.info( "Applied flux calibrations to red objects" )
 
     def run_wombat(self):
         """
