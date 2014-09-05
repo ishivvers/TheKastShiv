@@ -31,6 +31,7 @@ from dateutil import parser as date_parser
 from BeautifulSoup import BeautifulSoup
 from difflib import get_close_matches
 from time import sleep
+from astro.iAstro import smooth
 import urllib
 import os
 import re
@@ -770,9 +771,100 @@ def calibrate_idl( input_dict, idlpath=IDLPATH, cleanup=True ):
         print '\n\nStarting IDL & cal.pro'
         print 'Standard file:',std
         print 'Input file: cal.input'
-        print 'Type "cal"'
+        print 'Type "cal"\n'
         
         start_idl()
+
+######################################################################
+
+def coadd( files ):
+    """
+    Reads in a list of fits file namess (file formats as expected from flux-calibrated
+     spectra, after using the IDL routine cal.pro).
+    Simply takes the average amongst all spectra given.  If the wavelength 
+     arrays are different will interpolate all spectra onto the region covered
+     by all input spectra, rebinning all data to the same resolution first if needed
+     (using the resolution of the lowest-resolution spectrum).
+    Returns numpy arrays of wavelength, flux, and error.
+    """
+    hdus = [pf.open(f) for f in files]
+    res = max( [h[0].header['cdelt1'] for h in hdus] )
+    wlmin = max( [h[0].header['crval1'] for h in hdus] )
+    wlmax = min( [h[0].header['crval1'] + h[0].data.shape[-1]*h[0].header['cdelt1'] for h in hdus] )
+    # define the output wavelength range; go just over wlmax to make sure it's included
+    wl = np.arange( wlmin, wlmax+res/10.0, res )
+    fl = np.zeros_like(wl)
+    er = np.zeros_like(wl) #will add the appropriate errors in quadrature
+    for h in hdus:
+        thiswl = np.arange( h[0].header['crval1'], 
+                    h[0].header['crval1'] + h[0].data.shape[-1]*h[0].header['cdelt1'],
+                    h[0].header['cdelt1'])
+        thisfl = h[0].data[0]
+        thiser = h[0].data[1]
+        if h[0].header['crval1'] != res:
+            # need to rebin data to this resolution.
+            # will be a downsampling, so we first have to smooth the data
+            #  to this resolution using a square window.
+            # Note: I do not in any way downsample or smooth the noise estimates.
+            thisfl = smooth( thiswl, thisfl, width=res, window='flat' )
+        # ensure this spectrum is on the same wl array
+        fl += np.interp(wl, thiswl, thisfl)
+        er += (np.interp(wl, thiswl, thiser))**2
+    fl = fl / len(hdus)
+    er = er**.5 / len(hdus)
+    return wl, fl, er
+
+######################################################################
+
+def join( spec1, spec2, scaleside=2, interactive=True ):
+    """
+    Used to join the red and blue sides of Kast, or a similar spectrograph.
+    Each of spec1,2 should be a list of [wl, fl, er] (er is optional),
+     and spec1 must be the bluer spectrum.
+    Scaleside lets you choose between rescaling side 1 or side 2.
+    """
+    # calculate the overlap masks
+    m1 = spec1[0] >= spec2[0][0]
+    m2 = spec1[0][-1] >= spec2[0]
+    if interactive:
+        # let the user choose a different range
+        plt.figure()
+        plt.plot( spec1[0][m1], spec1[1][m1], 'b' )
+        plt.plot( spec2[0][m2], spec2[1][m2], 'r' )
+        print 'Click on the limits of the best overlap area'
+        [x1,y1],[x2,y2] = plt.ginput(n=2)
+        xmin, xmax = min([x1,x2]), max([x1,x2])
+        m1 = (spec1[0] >= xmin) & (spec1[0] <= xmax)
+        m2 = (spec2[0] >= xmin) & (spec2[0] <= xmax)
+        _,_, ymin,ymax = plt.axis()
+        plt.vlines( [xmin, xmax], ymin, ymax, colors='k', linestyles='dashed' )
+
+    # calculate the differences in the means of the overlap areas and rescale
+    factor = np.mean(spec2[1][m2])/np.mean(spec1[1][m1]) # factor by which spec2 is greater than spec1
+    if scaleside == 2:
+        spec2[1] = spec2[1]/factor
+        if len(spec2) > 2:
+            # rescale errors too
+            spec2[2] = spec2[2]/factor
+    elif scaleside == 1:
+        spec1[1] = spec1[1]*factor
+        if len(spec1) > 2:
+            spec1[2] = spec1[2]*factor
+    else:
+        raise Exception("scaleside must be 1 or 2")
+
+    # join the two at the middle of the overlap region
+    xmid = np.mean(spec1[0][m1])
+    m1 = spec1[0] <= xmid
+    m2 = spec2[0] > xmid
+    wl = np.hstack( (spec1[0][m1], spec2[0][m2]) )
+    fl = np.hstack( (spec1[1][m1], spec2[1][m2]) )
+    if (len(spec1) > 2) & (len(spec2) > 2):
+        er = np.hstack( (spec1[2][m1], spec2[2][m2]) )
+        return wl,fl,er
+    else:
+        return wl,fl
+
 
 ######################################################################
 # automation tools
