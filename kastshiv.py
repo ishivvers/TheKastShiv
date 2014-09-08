@@ -60,7 +60,7 @@ class Shiv(object):
                       self.extract_arc_spectra,
                       self.id_arcs,
                       self.apply_wavelength,
-                      self.flux_calibrate
+                      self.flux_calibrate,
                       self.coadd_join_output]
         self.current_step = 0
 
