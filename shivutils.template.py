@@ -777,7 +777,23 @@ def calibrate_idl( input_dict, idlpath=IDLPATH, cleanup=True ):
 
 ######################################################################
 
-def coadd( files ):
+def read_calfits( f ):
+    """
+    Reads in a fits file produced by cal.pro, returns wl,fl,er
+     numpy arrays.
+    """
+    hdu = pf.open( f )
+    wlmin = hdu[0].header['crval1']
+    res = hdu[0].header['cdelt1']
+    length = hdu[0].data.shape[-1]
+    wl = np.arange( wlmin, wlmin+res*length, res )
+    fl = hdu[0].data[0]
+    er = hdu[0].data[1]
+    return wl,fl,er
+
+######################################################################
+
+def coadd( files, weights='exptime' ):
     """
     Reads in a list of fits file namess (file formats as expected from flux-calibrated
      spectra, after using the IDL routine cal.pro).
@@ -785,12 +801,14 @@ def coadd( files ):
      arrays are different will interpolate all spectra onto the region covered
      by all input spectra, rebinning all data to the same resolution first if needed
      (using the resolution of the lowest-resolution spectrum).
+    weights can be one of ['equal', 'exptime']
     Returns numpy arrays of wavelength, flux, and error.
     """
     hdus = [pf.open(f) for f in files]
     res = max( [h[0].header['cdelt1'] for h in hdus] )
     wlmin = max( [h[0].header['crval1'] for h in hdus] )
     wlmax = min( [h[0].header['crval1'] + h[0].data.shape[-1]*h[0].header['cdelt1'] for h in hdus] )
+    totime = sum([float(h[0].header['exptime']) for h in hdus])
     # define the output wavelength range; go just over wlmax to make sure it's included
     wl = np.arange( wlmin, wlmax+res/10.0, res )
     fl = np.zeros_like(wl)
@@ -808,15 +826,21 @@ def coadd( files ):
             # Note: I do not in any way downsample or smooth the noise estimates.
             thisfl = smooth( thiswl, thisfl, width=res, window='flat' )
         # ensure this spectrum is on the same wl array
-        fl += np.interp(wl, thiswl, thisfl)
-        er += (np.interp(wl, thiswl, thiser))**2
-    fl = fl / len(hdus)
+        thisfl = np.interp(wl, thiswl, thisfl)
+        thiser = (np.interp(wl, thiswl, thiser))**2
+        if weights == 'exptime':
+            fl += thisfl*(float(h[0].header['exptime'])/totime)
+        elif weights == 'equal':
+            fl += thisfl/len(hdus)
+        else:
+            raise Exception('weights incorrectly defined!')
+        er += thiser # treat errors the same regardless of method
     er = er**.5 / len(hdus)
     return wl, fl, er
 
 ######################################################################
 
-def join( spec1, spec2, scaleside=2, interactive=True ):
+def join( spec1, spec2, scaleside=1, interactive=True ):
     """
     Used to join the red and blue sides of Kast, or a similar spectrograph.
     Each of spec1,2 should be a list of [wl, fl, er] (er is optional),
@@ -865,6 +889,22 @@ def join( spec1, spec2, scaleside=2, interactive=True ):
     else:
         return wl,fl
 
+######################################################################
+
+def np2flm( fname, wl,fl, er=None, headerstring='' ):
+    """
+    Saves numpy arrays of wavelength and flux into the 
+     Flipper-standard ascii *.flm file.
+    """
+    fout = open(fname, 'w')
+    fout.write('# File created by shivutils (I.Shivvers)\n# ' +\
+               headerstring + '\n# wl(A)   flm    er(optional)\n')
+    for i,w in enumerate(wl):
+        if er != None:
+            fout.write( '%.2f   %.8f   %.8f\n' %(w, fl[i], er[i]) )
+        else:
+            fout.write( '%.2f   %.8f\n' %(w, fl[i]) )
+    fout.close()
 
 ######################################################################
 # automation tools

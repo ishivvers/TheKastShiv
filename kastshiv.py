@@ -12,6 +12,7 @@ to do:
 
 import shivutils as su
 import os
+import re
 import logging
 import pickle
 from glob import glob
@@ -59,7 +60,8 @@ class Shiv(object):
                       self.extract_arc_spectra,
                       self.id_arcs,
                       self.apply_wavelength,
-                      self.flux_calibrate]
+                      self.flux_calibrate
+                      self.coadd_join_output]
         self.current_step = 0
 
         self.extracted_objects = []  #used to keep track of multiple observations of the same object
@@ -508,6 +510,8 @@ class Shiv(object):
         """
         Determine and apply the relevant flux calibration to all objects.
         """
+        # keep track of the files we create here, and move them to ../final
+        starting_files = glob('*.fits')
         self.log.info("Flux calibrating all objects")
         # match objects to standards take at the closest airmass
         allobjects = [self.opf+self.ebroot%o[0] for o in self.bobjects] +\
@@ -535,12 +539,74 @@ class Shiv(object):
             su.calibrate_idl( red_std_dict )
             self.log.info( "Applied flux calibrations to red objects" )
 
-    def run_wombat(self):
+        ending_files = glob('*.fits')
+        for f in ending_files:
+            if f not in starting_files:
+                run_cmd(' mv %s ../final/.' %f )
+        os.chdir( '../final' )
+
+    def coadd_join_output(self):
         """
-        Simply runs wombat as needed to combine files, etc.
+        Coadds any multiple observations of the same science object,
+         joins the red and blue sides of each observation, and then Saves
+         the result as an ASCII (.flm) file.
         """
-        print 'wombat? wombat! WOMBAT.   BWOMBWATTTT'
-        su.start_idl()
+        allfiles = glob('*[(uv)(ir)].ms.fits')
+        # try:
+        while True:
+            if self.interactive:
+                print 'Files remaining to process:'
+                for f in allfiles: print ' ',f
+                inn = raw_input('\nHit enter to continue, or q to quit\n')
+                if 'q' in inn.lower():
+                    break
+            f = [f for f in allfiles if 'uv' in f][0]
+            fred = f.replace('uv','ir')
+            namedate = re.search('.*\d{8}', f).group()
+            bluematches = glob( namedate + '*' + 'uv.ms.fits' )
+            redmatches = glob( namedate + '*' + 'ir.ms.fits' )
+            doit = True
+            if len(bluematches) == len(redmatches) == 1:
+                doit = False
+            if self.interactive and doit:
+                print 'Combine the following files: \n'+str(bluematches)+'\n'+str(redmatches)+'?\n'
+                inn = raw_input( 'y for yes, c for continue to the next file, anything else for no\n' )
+                if 'c' in inn.lower():
+                    allfiles.remove(f)
+                    continue
+                elif 'y' not in inn.lower():
+                    doit = False
+            if doit:
+                blue = list(su.coadd( bluematches ))
+                red = list(su.coadd( redmatches ))
+                for f in bluematches+redmatches:
+                    allfiles.remove(f)
+                self.log.info( 'Coadded the following files: '+str(bluematches))
+                self.log.info( 'Coadded the following files: '+str(redmatches))
+            else:
+                blue = list(su.read_calfits( f ))
+                red = list(su.read_calfits( fred ))
+                allfiles.remove(f)
+                allfiles.remove(fred)
+
+            wl,fl,er = su.join( blue, red, interactive=self.interactive )
+            self.log.info('Joined '+f+' to '+fred)
+            fname = f.replace('uv','uvir').replace('.ms.fits','.flm')
+            doit = True
+            if self.interactive:
+                su.plot_spectra( wl,fl,er, title=namedate )
+                inn = raw_input('Save ' + namedate + ' to file?\n')
+                if 'y' not in inn.lower():
+                    doit = False
+            if doit:
+                su.np2flm( fname, wl,fl,er )
+                self.log.info( namedate+' saved to file '+fname)
+        # except:
+            # pass
+        if len(allfiles) > 0:
+            print "Following files were not processed:"
+            for f in allfiles: print ' ',f
+
 
     def plt_flams(self):
         """
