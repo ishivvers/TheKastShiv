@@ -578,9 +578,12 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None,
                    t_function="legendre", t_order=4 )
     elif (reference != None) & (arc == False):
         iraf.apall(image, output=output, references=reference, interactive=interactive,
-                   find=no, recenter=no, resize=no, edit=no, trace=no,
+                   find=no, recenter=no, resize=no, edit=no, trace=yes,
                    fittrace=no, extract=yes, extras=yes, review=yes,
-                   background='fit', b_order=2, readnoise=rdnoise, gain=gain )
+                   background='fit', weights='variance', pfit='fit1d',
+                   readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
+                   ulimit=20, ylevel=0.01, b_order=2,
+                   t_function="legendre", t_order=4 )
     elif arc:
         iraf.apall(image, output=output, references=reference, interactive=no,
                    find=no, recenter=no, resize=no, edit=no, trace=no, fittrace=no,
@@ -591,7 +594,7 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None,
         if apfact == None:
             apfact = 1.0
         iraf.apall(image, output=output, references='', interactive=interactive,
-                   find=no, recenter=no, resize=no, edit=no, trace=yes,
+                   find=yes, recenter=yes, resize=yes, edit=yes, trace=yes,
                    fittrace=yes, extract=yes, extras=yes, review=yes,
                    background='fit',  b_order=2, weights='variance', pfit='fit1d',
                    readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
@@ -764,7 +767,7 @@ def calibrate_idl( input_dict, idlpath=IDLPATH, cleanup=True ):
         ftmp = open('cal.input','w')
         ftmp.write( '%s\n'%std )
         for val in input_dict[std]:
-            ftmp.write( '../working/%s\n'%val )
+            ftmp.write( '%s\n'%val )
         ftmp.close()
         
         # give the user some feedback

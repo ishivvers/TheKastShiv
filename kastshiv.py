@@ -346,7 +346,8 @@ class Shiv(object):
                 su.apply_flat( reds, 'nflat%d'%i )
                 self.log.info( '\nApplied flat nflat%d to the following files:\n'%i+',\n'.join(reds) )
 
-        self.opf = self.apf = 'f'+self.opf
+        if self.opf[0] != self.apf[0] != 'f':
+            self.opf = self.apf = 'f'+self.opf
 
     def reject_cosmic_rays(self):
         """
@@ -362,71 +363,74 @@ class Shiv(object):
             su.clean_cosmics( r, 'red' )
         self.log.info( '\nRemoved cosmic rays from the following files:\n'+',\n'.join(reds) )
 
-        self.opf = 'c'+self.opf
+        if self.opf[0] != 'c':
+            self.opf = 'c'+self.opf
 
-    def extract_object_spectra(self):
+    def extract_object_spectra(self, side=['red','blue']):
         """
         Extracts the spectra from each object.
         """
         self.log.info('Extracting spectra for red objects')
         # extract all red objects on the first pass
-        for o in self.robjects:
-            fname = self.opf+self.rroot%o[0]
-            # If we've already extracted this exact file, move on.
-            if fname in self.extracted_images:
-                print fname,'has already been extracted. Remove from self.extracted_images '+\
-                            'list if you want to run it again.'
-                continue
-            # If we've already extracted a spectrum of this object, use the first extraction
-            #  as a reference.
-            try:
-                reference = self.extracted_images[ self.extracted_objects.index( o[4] ) ]
-            except ValueError:
-                reference = None
+        if 'red' in side:
+            for o in self.robjects:
+                fname = self.opf+self.rroot%o[0]
+                # If we've already extracted this exact file, move on.
+                if fname in self.extracted_images:
+                    print fname,'has already been extracted. Remove from self.extracted_images '+\
+                                'list if you want to run it again.'
+                    continue
+                # If we've already extracted a spectrum of this object, use the first extraction
+                #  as a reference.
+                try:
+                    reference = self.extracted_images[ self.extracted_objects.index( o[4] ) ]
+                except ValueError:
+                    reference = None
 
-            if reference == None:
-                su.extract( fname, 'red', interact=self.interactive )
-                self.log.info('Extracted '+fname)
-            else:
-                su.extract( fname, 'red', reference=reference )
-                self.log.info('Used ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
-
-            self.extracted_objects.append( o[4] )
-            self.extracted_images.append( fname )
-            self.save()
-        # extract all blue objects on the second pass
-        for o in self.bobjects:
-            fname = self.opf+self.broot%o[0]
-            # If we've already extracted this exact file, move on.
-            if fname in self.extracted_images:
-                print fname,'has already been extracted. Remove from self.extracted_images '+\
-                            'list if you want to run it again.'
-                continue
-            # If we've already extracted a spectrum of this object, use the first extraction
-            #  as a reference or apfile reference (accounting for differences in blue and red pixel scales).
-            try:
-                reference = self.extracted_images[ self.extracted_objects.index( o[4] ) ]
-            except ValueError:
-                reference = None
-
-            if reference == None:
-                su.extract( fname, 'blue', interact=self.interactive )
-            else:
-                if 'blue' in reference:
-                    # go ahead and simply use as a reference
-                    su.extract( fname, 'blue', reference=reference )
-                    self.log.info('Used ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
-                elif 'red' in reference:
-                    # Need to pass along apfile and conversion factor to map the red extraction
-                    #  onto this blue image. Blue CCD has a plate scale 1.8558 times larger than the red.
-                    apfile = 'database/ap'+reference.strip('.fits')
-                    su.extract( fname, 'blue', apfile=apfile, apfact=1.8558, interact=self.interactive )
-                    self.log.info('Used apfiles from ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
+                if reference == None:
+                    su.extract( fname, 'red', interact=self.interactive )
+                    self.log.info('Extracted '+fname)
                 else:
-                    raise StandardError( 'We have a situation with aperature referencing.' )
-            self.extracted_objects.append( o[4] )
-            self.extracted_images.append( fname )
-            self.save()
+                    su.extract( fname, 'red', reference=reference )
+                    self.log.info('Used ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
+
+                self.extracted_objects.append( o[4] )
+                self.extracted_images.append( fname )
+                self.save()
+        # extract all blue objects on the second pass
+        if 'blue' in side:
+            for o in self.bobjects:
+                fname = self.opf+self.broot%o[0]
+                # If we've already extracted this exact file, move on.
+                if fname in self.extracted_images:
+                    print fname,'has already been extracted. Remove from self.extracted_images '+\
+                                'list if you want to run it again.'
+                    continue
+                # If we've already extracted a spectrum of this object, use the first extraction
+                #  as a reference or apfile reference (accounting for differences in blue and red pixel scales).
+                try:
+                    reference = self.extracted_images[ self.extracted_objects.index( o[4] ) ]
+                except ValueError:
+                    reference = None
+
+                if reference == None:
+                    su.extract( fname, 'blue', interact=self.interactive )
+                else:
+                    if 'blue' in reference:
+                        # go ahead and simply use as a reference
+                        su.extract( fname, 'blue', reference=reference, interac=self.interactive )
+                        self.log.info('Used ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
+                    elif 'red' in reference:
+                        # Need to pass along apfile and conversion factor to map the red extraction
+                        #  onto this blue image. Blue CCD has a plate scale 1.8558 times larger than the red.
+                        apfile = 'database/ap'+reference.strip('.fits')
+                        su.extract( fname, 'blue', apfile=apfile, apfact=1.8558, interact=self.interactive )
+                        self.log.info('Used apfiles from ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
+                    else:
+                        raise StandardError( 'We have a situation with aperature referencing.' )
+                self.extracted_objects.append( o[4] )
+                self.extracted_images.append( fname )
+                self.save()
 
     def extract_arc_spectra(self):
         """
@@ -503,8 +507,8 @@ class Shiv(object):
                 redarc = redarcs[0]
             su.disp_correct( self.opf+self.erroot%o[0], redarc )
             self.log.info("Applied wavelength solution from "+redarc+" to "+self.opf+self.erroot%o[0])
-
-        self.opf = 'd'+self.opf
+        if self.opf[0] != 'd':
+            self.opf = 'd'+self.opf
 
     def flux_calibrate(self, side=None):
         """
@@ -542,7 +546,7 @@ class Shiv(object):
         ending_files = glob('*.fits')
         for f in ending_files:
             if f not in starting_files:
-                run_cmd(' mv %s ../final/.' %f )
+                su.run_cmd(' mv %s ../final/.' %f )
         os.chdir( '../final' )
 
     def coadd_join_output(self):
