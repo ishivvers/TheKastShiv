@@ -159,7 +159,7 @@ def get_kast_data( datestring, outfile=None, unpack=True,
         outfile = 'alldata.tgz'
     date = date_parser.parse(datestring)
     cmd = 'wget --no-check-certificate --http-user="%s" --http-passwd="%s" '+\
-            '-O %s "https://mthamilton.ucolick.org/data/%.2d-%.2d/%d/shane/?tarball=true&allfiles=true"' 
+            '-O %s "https://mthamilton.ucolick.org/data/%.2d-%.2d/%.2d/shane/?tarball=true&allfiles=true"' 
     print 'downloading data, be patient...'
     run_cmd( cmd %(un, pw, outfile, date.year, date.month, date.day) )
     if unpack:
