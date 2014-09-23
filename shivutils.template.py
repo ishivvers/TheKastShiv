@@ -31,6 +31,7 @@ from dateutil import parser as date_parser
 from BeautifulSoup import BeautifulSoup
 from difflib import get_close_matches
 from time import sleep
+from astro.iAstro import smooth
 import urllib
 import os
 import re
@@ -139,9 +140,13 @@ def start_idl( idlpath=IDLPATH ):
     """
     start an interactive IDL session.
     """
-    session = IDL( idlpath )
-    session.interact()
-    session.close()
+    try:
+        session = IDL( idlpath )
+        session.interact()
+        session.close()
+    except OSError:
+        # idl often returns an os error if you just type 'exit'
+        return
 
 ############################################################################
 
@@ -154,7 +159,7 @@ def get_kast_data( datestring, outfile=None, unpack=True,
         outfile = 'alldata.tgz'
     date = date_parser.parse(datestring)
     cmd = 'wget --no-check-certificate --http-user="%s" --http-passwd="%s" '+\
-            '-O %s "https://mthamilton.ucolick.org/data/%.2d-%.2d/%d/shane/?tarball=true&allfiles=true"' 
+            '-O %s "https://mthamilton.ucolick.org/data/%.2d-%.2d/%.2d/shane/?tarball=true&allfiles=true"' 
     print 'downloading data, be patient...'
     run_cmd( cmd %(un, pw, outfile, date.year, date.month, date.day) )
     if unpack:
@@ -182,6 +187,8 @@ def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None, infile=
         # parse a local log, skip the header
         lines = open(infile,'r').readlines()[1:] 
         for l in lines:
+            if l[0] == '#':
+                continue
             try:
                 l = l.split()
                 if '-' in l[0]:
@@ -262,7 +269,7 @@ def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None, infile=
                 objname = cols[1].string.lower().strip()
                 for match in re.findall('[UuIi][VvRr]', objname ):
                     objname = objname.replace(match,'')
-                objname = objname.strip()
+                objname = objname.strip().replace(' ','_')
                 for on in obsnums:
                     objects.append( [on, sidenum, groupnum, obstype, objname])
             elif obstype == 'arc':
@@ -525,7 +532,7 @@ def parse_apfile( apfile ):
     lo = float([l for l in lines if 'low' in l][0].split(' ')[-1].strip())
     hi = float([l for l in lines if 'high' in l][0].split(' ')[-1].strip())
     sampline = [l for l in lines if 'sample' in l][0]
-    lbglo, lbghi, rbglo, rbghi = map(float, re.findall('-?\d+',sampline))
+    lbglo, lbghi, rbglo, rbghi = map(float, re.findall('-?\d+\.?\d*',sampline))
     return (lo,hi), (lbglo, lbghi), (rbglo, rbghi)
 
 ######################################################################
@@ -567,13 +574,16 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None,
                    fittrace=yes, extract=yes, extras=yes, review=yes,
                    background='fit', weights='variance', pfit='fit1d',
                    readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
-                   ulimit=20, ylevel=0.01, b_sample="-35:-25,25:35", 
+                   ulimit=20, ylevel=0.01, b_sample="-35:-25,25:35", b_order=2,
                    t_function="legendre", t_order=4 )
     elif (reference != None) & (arc == False):
-        iraf.apall(image, output=output, references=reference, interactive=no,
-                   find=no, recenter=no, resize=no, edit=no, trace=no,
-                   fittrace=no, extract=yes, extras=yes, review=no,
-                   background='fit', readnoise=rdnoise, gain=gain )
+        iraf.apall(image, output=output, references=reference, interactive=interactive,
+                   find=no, recenter=no, resize=no, edit=no, trace=yes,
+                   fittrace=no, extract=yes, extras=yes, review=yes,
+                   background='fit', weights='variance', pfit='fit1d',
+                   readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
+                   ulimit=20, ylevel=0.01, b_order=2,
+                   t_function="legendre", t_order=4 )
     elif arc:
         iraf.apall(image, output=output, references=reference, interactive=no,
                    find=no, recenter=no, resize=no, edit=no, trace=no, fittrace=no,
@@ -584,9 +594,9 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None,
         if apfact == None:
             apfact = 1.0
         iraf.apall(image, output=output, references='', interactive=interactive,
-                   find=no, recenter=yes, resize=no, edit=yes, trace=yes,
+                   find=yes, recenter=yes, resize=yes, edit=yes, trace=yes,
                    fittrace=yes, extract=yes, extras=yes, review=yes,
-                   background='fit', weights='variance', pfit='fit1d',
+                   background='fit',  b_order=2, weights='variance', pfit='fit1d',
                    readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
                    ulimit=20, ylevel=0.01, t_function="legendre", t_order=4,
                    lower=ap[0]*apfact, upper=ap[1]*apfact,
@@ -757,16 +767,147 @@ def calibrate_idl( input_dict, idlpath=IDLPATH, cleanup=True ):
         ftmp = open('cal.input','w')
         ftmp.write( '%s\n'%std )
         for val in input_dict[std]:
-            ftmp.write( '../working/%s\n'%val )
+            ftmp.write( '%s\n'%val )
         ftmp.close()
         
         # give the user some feedback
         print '\n\nStarting IDL & cal.pro'
         print 'Standard file:',std
         print 'Input file: cal.input'
-        print 'Type "cal"'
+        print 'Type "cal"\n'
         
         start_idl()
+
+######################################################################
+
+def read_calfits( f ):
+    """
+    Reads in a fits file produced by cal.pro, returns wl,fl,er
+     numpy arrays.
+    """
+    hdu = pf.open( f )
+    wlmin = hdu[0].header['crval1']
+    res = hdu[0].header['cdelt1']
+    length = hdu[0].data.shape[-1]
+    wl = np.arange( wlmin, wlmin+res*length, res )
+    fl = hdu[0].data[0]
+    er = hdu[0].data[1]
+    return wl,fl,er
+
+######################################################################
+
+def coadd( files, weights='exptime' ):
+    """
+    Reads in a list of fits file namess (file formats as expected from flux-calibrated
+     spectra, after using the IDL routine cal.pro).
+    Simply takes the average amongst all spectra given.  If the wavelength 
+     arrays are different will interpolate all spectra onto the region covered
+     by all input spectra, rebinning all data to the same resolution first if needed
+     (using the resolution of the lowest-resolution spectrum).
+    weights can be one of ['equal', 'exptime']
+    Returns numpy arrays of wavelength, flux, and error.
+    """
+    hdus = [pf.open(f) for f in files]
+    res = max( [h[0].header['cdelt1'] for h in hdus] )
+    wlmin = max( [h[0].header['crval1'] for h in hdus] )
+    wlmax = min( [h[0].header['crval1'] + h[0].data.shape[-1]*h[0].header['cdelt1'] for h in hdus] )
+    totime = sum([float(h[0].header['exptime']) for h in hdus])
+    # define the output wavelength range; go just over wlmax to make sure it's included
+    wl = np.arange( wlmin, wlmax+res/10.0, res )
+    fl = np.zeros_like(wl)
+    er = np.zeros_like(wl) #will add the appropriate errors in quadrature
+    for h in hdus:
+        thiswl = np.arange( h[0].header['crval1'], 
+                    h[0].header['crval1'] + h[0].data.shape[-1]*h[0].header['cdelt1'],
+                    h[0].header['cdelt1'])
+        thisfl = h[0].data[0]
+        thiser = h[0].data[1]
+        if h[0].header['crval1'] != res:
+            # need to rebin data to this resolution.
+            # will be a downsampling, so we first have to smooth the data
+            #  to this resolution using a square window.
+            # Note: I do not in any way downsample or smooth the noise estimates.
+            thisfl = smooth( thiswl, thisfl, width=res, window='flat' )
+        # ensure this spectrum is on the same wl array
+        thisfl = np.interp(wl, thiswl, thisfl)
+        thiser = (np.interp(wl, thiswl, thiser))**2
+        if weights == 'exptime':
+            fl += thisfl*(float(h[0].header['exptime'])/totime)
+        elif weights == 'equal':
+            fl += thisfl/len(hdus)
+        else:
+            raise Exception('weights incorrectly defined!')
+        er += thiser # treat errors the same regardless of method
+    er = er**.5 / len(hdus)
+    return wl, fl, er
+
+######################################################################
+
+def join( spec1, spec2, scaleside=1, interactive=True ):
+    """
+    Used to join the red and blue sides of Kast, or a similar spectrograph.
+    Each of spec1,2 should be a list of [wl, fl, er] (er is optional),
+     and spec1 must be the bluer spectrum.
+    Scaleside lets you choose between rescaling side 1 or side 2.
+    """
+    # calculate the overlap masks
+    m1 = spec1[0] >= spec2[0][0]
+    m2 = spec1[0][-1] >= spec2[0]
+    if interactive:
+        # let the user choose a different range
+        plt.figure()
+        plt.plot( spec1[0][m1], spec1[1][m1], 'b' )
+        plt.plot( spec2[0][m2], spec2[1][m2], 'r' )
+        print 'Click on the limits of the best overlap area'
+        [x1,y1],[x2,y2] = plt.ginput(n=2)
+        xmin, xmax = min([x1,x2]), max([x1,x2])
+        m1 = (spec1[0] >= xmin) & (spec1[0] <= xmax)
+        m2 = (spec2[0] >= xmin) & (spec2[0] <= xmax)
+        _,_, ymin,ymax = plt.axis()
+        plt.vlines( [xmin, xmax], ymin, ymax, colors='k', linestyles='dashed' )
+
+    # calculate the differences in the means of the overlap areas and rescale
+    factor = np.mean(spec2[1][m2])/np.mean(spec1[1][m1]) # factor by which spec2 is greater than spec1
+    if scaleside == 2:
+        spec2[1] = spec2[1]/factor
+        if len(spec2) > 2:
+            # rescale errors too
+            spec2[2] = spec2[2]/factor
+    elif scaleside == 1:
+        spec1[1] = spec1[1]*factor
+        if len(spec1) > 2:
+            spec1[2] = spec1[2]*factor
+    else:
+        raise Exception("scaleside must be 1 or 2")
+
+    # join the two at the middle of the overlap region
+    xmid = np.mean(spec1[0][m1])
+    m1 = spec1[0] <= xmid
+    m2 = spec2[0] > xmid
+    wl = np.hstack( (spec1[0][m1], spec2[0][m2]) )
+    fl = np.hstack( (spec1[1][m1], spec2[1][m2]) )
+    if (len(spec1) > 2) & (len(spec2) > 2):
+        er = np.hstack( (spec1[2][m1], spec2[2][m2]) )
+        return wl,fl,er
+    else:
+        return wl,fl
+
+######################################################################
+
+def np2flm( fname, wl,fl, er=None, headerstring='' ):
+    """
+    Saves numpy arrays of wavelength and flux into the 
+     Flipper-standard ascii *.flm file.
+    """
+    fout = open(fname, 'w')
+    fout.write('# File created by shivutils (I.Shivvers)\n# ' +\
+               headerstring + '\n# wl(A)   flm    er(optional)\n')
+    for i,w in enumerate(wl):
+        if er != None:
+            fout.write( '%.2f   %.8f   %.8f\n' %(w, fl[i], er[i]) )
+        else:
+            fout.write( '%.2f   %.8f\n' %(w, fl[i]) )
+    fout.close()
 
 ######################################################################
 # automation tools
