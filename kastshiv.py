@@ -583,8 +583,15 @@ class Shiv(object):
             if doit:
                 blue = list(su.coadd( bluematches ))
                 red = list(su.coadd( redmatches ))
-                for f in bluematches+redmatches:
-                    allfiles.remove(f)
+                for fff in bluematches+redmatches:
+                    allfiles.remove(fff)
+                # need to update the filename to show that it was averaged
+                # assumes that all were observed on the same day
+                f_timestr = re.search( '\.\d{3}', f ).group()
+                avg_time = mean( [float(re.search('\.\d{3}', fff).group()) for fff in bluematches] )
+                new_timestr = ('%.3f'%avg_time)[1:] #drop the leading 0
+                f = f.replace( f_timestr, new_timestr )
+                
                 self.log.info( 'Coadded the following files: '+str(bluematches))
                 self.log.info( 'Coadded the following files: '+str(redmatches))
             else:
