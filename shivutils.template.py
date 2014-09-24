@@ -594,7 +594,7 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None,
         if apfact == None:
             apfact = 1.0
         iraf.apall(image, output=output, references='', interactive=interactive,
-                   find=yes, recenter=yes, resize=yes, edit=yes, trace=yes,
+                   find=no, recenter=no, resize=no, edit=yes, trace=yes,
                    fittrace=yes, extract=yes, extras=yes, review=yes,
                    background='fit',  b_order=2, weights='variance', pfit='fit1d',
                    readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
