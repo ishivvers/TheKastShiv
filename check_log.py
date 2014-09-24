@@ -9,10 +9,14 @@ from glob import glob
 from bs4 import BeautifulSoup
 from credentials import wiki_un, wiki_pw
 
-def wiki2logfile( pagename, outfile=None ):
-    if outfile == None:
-        outfile = pagename + '.log'
-    
+def wiki2log( pagename, outfile=None ):
+    """
+    Given a pagename (the string after id= in the wiki page URL),
+     returns lists of objects, arcs, flats.  Each entry is formatted:
+     [obs #, side #, group #, object name]
+    If outfile is given, will save the log to that as an ascii file.
+    Note: only includes UVIR observations (sides 1,2)
+    """
     creds = urllib.urlencode({"u" : wiki_un, "p" : wiki_pw})
 
     # open the Night Summary page for the run
@@ -24,9 +28,10 @@ def wiki2logfile( pagename, outfile=None ):
     else:
         rows = soup.body.table.findAll('tr')
 
-    # Here is the output table format
-    output = open(outfile,'w')
-    output.write('Obs      Side   Group  Type     Name\n')
+    if outfile != None:
+        # Here is the output table format
+        output = open(outfile,'w')
+        output.write('Obs      Side   Group  Type     Name\n')
     
     objects, arcs, flats = [], [], []
     for row in rows[1:]: #skip header row
@@ -65,14 +70,17 @@ def wiki2logfile( pagename, outfile=None ):
         else:
             raise StandardError('Error reading log!')
 
-        # add to output log 
-        if obstype == 'obj':
-            output.write( "%s %s %s %s %s\n" %(cols[0].string.strip().ljust(8), cols[2].string.strip().ljust(6),
-                                            cols[3].string.strip().ljust(6), obstype.ljust(8), objname) )
-        else:
-            output.write( "%s %s %s %s\n" %(cols[0].string.strip().ljust(8), cols[2].string.strip().ljust(6),
-                                                cols[3].string.strip().ljust(6), obstype) )
-    output.close()
+        if outfile != None:
+            # add to output log 
+            if obstype == 'obj':
+                output.write( "%s %s %s %s %s\n" %(cols[0].string.strip().ljust(8), cols[2].string.strip().ljust(6),
+                                                cols[3].string.strip().ljust(6), obstype.ljust(8), objname) )
+            else:
+                output.write( "%s %s %s %s\n" %(cols[0].string.strip().ljust(8), cols[2].string.strip().ljust(6),
+                                                    cols[3].string.strip().ljust(6), obstype) )
+    if outfile != None:
+        output.close()
+    return objects, arcs, flats
 
 
 def load_elog( infile ):
@@ -111,18 +119,21 @@ def load_elog( infile ):
 
     return objects, arcs, flats
 
-def check_log( localfile, pagename=None, path_to_files=None ):
+def check_log( localfile=None, pagename=None, path_to_files=None ):
     """
     Returns a boolean tuple: (pass, warning)
+    Either localfile or pagename must be given.
      localfile : path to the logfile, or path to save the logfile to
      pagename : if given, will download wiki elog from there (string after 'id=' in wiki URL)
      path_to_files : if given, will check all of the fits files in that folder against this log.
                      files must be named in Lick format (i.e. 'r31.fits')
     """
-    
     if pagename != None:
-        wiki2logfile( pagename, outfile=localfile )
-    objects, arcs, flats = load_elog( localfile )
+        objects, arcs, flats = wiki2log( pagename )
+    elif localfile != None:
+        objects, arcs, flats = load_elog( localfile )
+    else:
+        raise Exception( 'Must include either pagename of localfile' )
     warning = False
     
     # assert that no observations are repeated
