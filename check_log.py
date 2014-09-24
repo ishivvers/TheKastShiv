@@ -2,8 +2,12 @@
 A python script to check an online wiki e-log for proper format.
 """
 
-wiki_un = 'ishivvers'
-wiki_pw = 'bojangles'
+import urllib
+import re
+import pyfits as pf
+from glob import glob
+from bs4 import BeautifulSoup
+from credentials import wiki_un, wiki_pw
 
 def wiki2logfile( pagename, outfile=None ):
     if outfile == None:
@@ -73,6 +77,7 @@ def wiki2logfile( pagename, outfile=None ):
 
 def load_elog( infile ):
     # parse a local log, skip the header
+    objects, arcs, flats = [], [], []
     lines = open(infile,'r').readlines()[1:] 
     for l in lines:
         try:
@@ -106,12 +111,107 @@ def load_elog( infile ):
 
     return objects, arcs, flats
 
-def check_log( localfile, pagefile=None ):
+def check_log( localfile, pagename=None, path_to_files=None ):
+    """
+    Returns a boolean tuple: (pass, warning)
+     localfile : path to the logfile, or path to save the logfile to
+     pagename : if given, will download wiki elog from there (string after 'id=' in wiki URL)
+     path_to_files : if given, will check all of the fits files in that folder against this log.
+                     files must be named in Lick format (i.e. 'r31.fits')
+    """
     
-    if pagefile != None:
-        wiki2logfile( pagefile, outfile=localfile )
+    if pagename != None:
+        wiki2logfile( pagename, outfile=localfile )
     objects, arcs, flats = load_elog( localfile )
+    warning = False
     
     # assert that no observations are repeated
-    
+    allblues = [l[0] for l in objects+arcs+flats if l[1] == 1]
+    overlaps = set( [l for l in allblues if allblues.count(l) > 1] )
+    if overlaps:
+        raise Exception( 'The following blue exposure numbers are used more than once: '+','.join( map(str,overlaps) ) )
+    allreds = [l[0] for l in objects+arcs+flats if l[1] == 2]
+    overlaps = set( [l for l in allreds if allreds.count(l) > 1] )
+    if overlaps:
+        raise Exception( 'The following red exposure numbers are used more than once: '+','.join( map(str,overlaps) ) )
+
+    # assert that each red object has associated arcs and flats
+    redobjs = [o for o in objects if o[1] == 2]
+    for o in redobjs:
+        thesearcs = [a for a in arcs if (a[1] == 2 and a[2] == o[2])]
+        if not thesearcs:
+            raise Exception( 'The following object has no associated arcs: \n' +\
+                             ' red %d ::: group %d' %(o[0],o[2]) )
+        elif len(thesearcs) != 1:
+            # usually the first red object has the 0.5" arcs too; don't raise a warning for that
+            if o[2] != 2:
+                print 'Warning: the following object has %d arcs associated with it:\n'%len(thesearcs) +\
+                      ' red %d ::: group %d' %(o[0],o[2])
+                print
+                warning = True
+        theseflats = [f for f in flats if (f[1] == 2 and f[2] == o[2])]
+        if not theseflats:
+            raise Exception( 'The following object has no associated flats: \n' +\
+                             ' red %d ::: group %d' %(o[0],o[2]) )
+        elif len(theseflats) != 3:
+            print 'Warning: the following object has %d flats associated with it:\n'%len(theseflats) +\
+                  ' red %d ::: group %d' %(o[0],o[2])
+            print
+            warning = True
+
+    # assert that blue arcs and flats exist, and that all blue objects are associated with them
+    bluearcs = [a for a in arcs if a[1] == 1]
+    if not bluearcs:
+        raise Exception( 'No blue arcs included.' )
+    blueflats = [f for f in flats if f[1] == 1]
+    if not blueflats:
+        raise Exception( 'No blue flats included' )
+    bluemismatch = [o for o in objects if (o[1] == 1 and o[2] != 1)]
+    if bluemismatch:
+        raise Exception( 'The following objects are listed as side 1, but not group 1:\n' +\
+                         '\n'.join( [' blue %d' %o[1] for o in bluemismatch] ) )
+
+    if path_to_files != None:
+        # go through each file and assert that it exists and is the type it's supposed to be
+        for a in arcs:
+            if a[1] == 1:
+                pre = 'b'
+            else:
+                pre = 'r'
+            hdu = pf.open( path_to_files + '/%s%d.fits'%(pre, a[0]) )[0]
+            if 'arc' not in hdu.header['object'].lower():
+                print 'Warning: %s%d.fits may not be an arc! (group ::: %d)' %(pre, a[0], a[2])
+                print 'Object name:',hdu.header['object']
+                print
+                warning = True
+            if [hdu.header[k] for k in hdu.header.keys() if 'LAMPSTA' in k].count('on') < 1:
+                print 'Warning: maybe no arclamps on during arclamp observation %s%d.fits?'%(pre, a[0])
+                warning = True
         
+        for f in flats:
+            if f[1] == 1:
+                pre = 'b'
+            else:
+                pre = 'r'
+            hdu = pf.open( path_to_files + '/%s%d.fits'%(pre, f[0]) )[0]
+            if 'flat' not in hdu.header['object'].lower():
+                print 'Warning: %s%d.fits may not be a flat! (group ::: %d)'%(pre, f[0], f[2])
+                print 'Object name:',hdu.header['object']
+                print
+                warning = True
+            if [hdu.header[k] for k in hdu.header.keys() if 'LAMPSTA' in k].count('on') < 1:
+                print 'Warning: maybe no lamps on during flat observation %s%d.fits?'%(pre, f[0])
+                warning = True
+
+        for o in objects:
+            if o[1] == 1:
+                pre = 'b'
+            else:
+                pre = 'r'
+            hdu = pf.open( path_to_files + '/%s%d.fits'%(pre, o[0]) )[0]
+            if ('flat' in hdu.header['object'].lower()) or ('arc' in hdu.header['object'].lower()):
+                print 'Warning: %s%d.fits may not be a flat or an arc! (group ::: %d)'%(pre, o[0], o[2])
+            if [hdu.header[k] for k in hdu.header.keys() if 'LAMPSTA' in k].count('on') > 0:
+                raise Exception( 'Lamp on during object observation %s%d.fits!'%(pre, o[0]))
+
+    return True, warning
