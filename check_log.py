@@ -231,11 +231,11 @@ def check_log( localfile=None, pagename=None, path_to_files=None ):
             hdu = pf.open( path_to_files + '/%s%d.fits'%(pre, o[0]) )[0]
             if ('flat' in hdu.header['object'].lower()) or ('arc' in hdu.header['object'].lower()):
                 print 'Warning: %s%d.fits may not be an object! (group ::: %d)'%(pre, o[0], o[2])
-                print ' Log object name: %s ::: Fits file object name: %s' %(o[3], hdu.header['object'])
+                print ' Log object name: %s ::: Fits file object name: %s' %(o[4], hdu.header['object'])
                 print
             elif SequenceMatcher( a=o[3], b=hdu.header['object'] ).ratio() < 0.5:
                 print 'Warning: %s%d.fits may not be the correct object!'%(pre, o[0])
-                print ' Log object name: %s ::: Fits file object name: %s' %(o[3], hdu.header['object'])
+                print ' Log object name: %s ::: Fits file object name: %s' %(o[4], hdu.header['object'])
                 print
             if [hdu.header[k] for k in hdu.header.keys() if 'LAMPSTA' in k].count('on') > 0:
                 print 'Warning: lamp may have been on during object observation %s%d.fits!'%(pre, o[0])
