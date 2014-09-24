@@ -546,8 +546,8 @@ def parse_apfile( apfile ):
 
 ######################################################################
 
-def extract( image, side, arc=False, output=None, interact=True, reference=None,
-             apfile=None, apfact=None):
+def extract( image, side, arc=False, output=None, interact=True, reference=None, trace_only=False,
+             apfile=None, apfact=None, line_number=INDEF):
     """
     Use apall to extract the spectrum.
     
@@ -555,7 +555,12 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None,
     If this is not the first spectrum from a set of consecutive observations
      of the same object, pass along the extracted first observation as 'reference';
      this will force interact=False and will use the parameters from the reference.
+    If 'reference' is given and trace_only is True, will only use the reference to define the
+     trace pattern, and not the aperature.  This is useful for extracting nebular spectra,
+     when you can pass an image of the standard star along as a reference to define the trace.
+     If 'reference' is not given, trace_only is ignored.
     If output is not given, follows IRAF standard and sticks ".ms." in middle of filename.
+    If 'line_number' is given, will use that column of the image to define the aperture.
     If apfile is given, will use the aperture and background properties from that apfile,
      first multiplying by apfact if given (accounts for pixel size differences).
      Note: using either arc or reference keys will override the apfile.
@@ -584,15 +589,24 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None,
                    background='fit', weights='variance', pfit='fit1d',
                    readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
                    ulimit=20, ylevel=0.01, b_sample="-35:-25,25:35", b_order=2,
-                   t_function="legendre", t_order=4 )
+                   t_function="legendre", t_order=4, line=line_number )
     elif (reference != None) & (arc == False):
-        iraf.apall(image, output=output, references=reference, interactive=interactive,
-                   find=no, recenter=no, resize=no, edit=no, trace=yes,
-                   fittrace=no, extract=yes, extras=yes, review=yes,
-                   background='fit', weights='variance', pfit='fit1d',
-                   readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
-                   ulimit=20, ylevel=0.01, b_order=2,
-                   t_function="legendre", t_order=4 )
+        if not trace_only:
+            iraf.apall(image, output=output, references=reference, interactive=interactive,
+                       find=no, recenter=no, resize=no, edit=no, trace=yes,
+                       fittrace=no, extract=yes, extras=yes, review=yes,
+                       background='fit', weights='variance', pfit='fit1d',
+                       readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
+                       ulimit=20, ylevel=0.01, b_order=2,
+                       t_function="legendre", t_order=4, line=line_number )
+        else:
+            iraf.apall(image, output=output, references=reference, interactive=interactive,
+                       find=yes, recenter=yes, resize=yes, edit=yes, trace=yes,
+                       fittrace=no, extract=yes, extras=yes, review=yes,
+                       background='fit', weights='variance', pfit='fit1d',
+                       readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
+                       ulimit=20, ylevel=0.01, b_order=2,
+                       t_function="legendre", t_order=4, line=line_number )
     elif arc:
         iraf.apall(image, output=output, references=reference, interactive=no,
                    find=no, recenter=no, resize=no, edit=no, trace=no, fittrace=no,
@@ -603,12 +617,12 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None,
         if apfact == None:
             apfact = 1.0
         iraf.apall(image, output=output, references='', interactive=interactive,
-                   find=yes, recenter=yes, resize=yes, edit=yes, trace=yes,
+                   find=no, recenter=no, resize=no, edit=yes, trace=yes,
                    fittrace=yes, extract=yes, extras=yes, review=yes,
                    background='fit',  b_order=2, weights='variance', pfit='fit1d',
                    readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
                    ulimit=20, ylevel=0.01, t_function="legendre", t_order=4,
-                   lower=ap[0]*apfact, upper=ap[1]*apfact,
+                   lower=ap[0]*apfact, upper=ap[1]*apfact, line=line_number,
                    b_sample="%.2f:%.2f,%.2f:%.2f" %(lbg[0]*apfact, lbg[1]*apfact, rbg[0]*apfact, rbg[1]*apfact) )
     else:
         raise StandardError( "unacceptable keyword combination" )
