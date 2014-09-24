@@ -114,9 +114,17 @@ def populate_working_dir( runID, logfile=None, all_obs=None ):
     # copy over all relevant files to working directory and rename them
     for o in all_obs:
         if o[1] == 1:
-            run_cmd( 'cp ../rawdata/b%d.fits %sblue%.3d.fits' %(o[0],runID,o[0]) )
+            prefix = 'blue'
         elif o[1] == 2:
-            run_cmd( 'cp ../rawdata/r%d.fits %sred%.3d.fits' %(o[0],runID,o[0]) )
+            prefix = 'red'
+        # if there are updated files (i.e. r001.fits.1) use the one observed last
+        fs = glob( '../rawdata/%s%d.fits.*' %(prefix[0], o[0]) )
+        if not fs:
+            run_cmd( 'cp ../rawdata/%s%d.fits %s%s%.3d.fits' %(prefix[0],o[0], runID,prefix,o[0]) )
+        else:
+            fs.sort( key=lambda x: x[-1] )
+            fname = fs[-1]
+            run_cmd( 'cp %s %s%s%.3d.fits' %(fname,runID,prefix,o[0]))
     
     # change permissions
     run_cmd( 'chmod a+rw *.fits' )
@@ -150,7 +158,7 @@ def start_idl( idlpath=IDLPATH ):
 
 ############################################################################
 
-def get_kast_data( datestring, outfile=None, unpack=True,
+def get_kast_data( datestring, outfile=None, unpack=True, 
                    un=credentials.repository_un, pw=credentials.repository_pw ):
     """
     Download kast data from a date (in the datestring).
@@ -165,9 +173,10 @@ def get_kast_data( datestring, outfile=None, unpack=True,
     if unpack:
         cmd = 'tar -xzvf %s' %outfile
         run_cmd(cmd)
-        run_cmd( 'mv data*/*.fits .' )
+        run_cmd( 'mv data*/* .' )
         run_cmd( 'rm %s'%outfile )
         run_cmd( 'rm -r data*' )
+
 
 ############################################################################
 
@@ -266,7 +275,7 @@ def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None, infile=
             if obstype == 'obj':
                 # find the and clean up the object's name
                 # remove anything like a slit width or "IR/UV"
-                objname = cols[1].string.lower().strip()
+                objname = cols[1].string.lower().strip().encode('ascii','ignore')
                 for match in re.findall('[UuIi][VvRr]', objname ):
                     objname = objname.replace(match,'')
                 objname = objname.strip().replace(' ','_')

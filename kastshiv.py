@@ -294,7 +294,7 @@ class Shiv(object):
         reds = [self.opf+self.rroot%o[0] for o in self.robjects+self.rflats+self.rarcs]
         su.bias_correct( reds, self.r_ytrim[0], self.r_ytrim[1] )
 
-        self.opf = self.fpf = self.apf = 'b'+self.opf
+        self.opf = self.fpf = self.apf = 'b'
         self.log.info( '\nApplied trim section (%.4f, %.4f) to following files:\n'%(self.b_ytrim[0], self.b_ytrim[1])+',\n'.join(blues) )
         self.log.info( '\nApplied trim section (%.4f, %.4f) to following files:\n'%(self.r_ytrim[0], self.r_ytrim[1])+',\n'.join(reds) )
 
@@ -346,8 +346,7 @@ class Shiv(object):
                 su.apply_flat( reds, 'nflat%d'%i )
                 self.log.info( '\nApplied flat nflat%d to the following files:\n'%i+',\n'.join(reds) )
 
-        if self.opf[0] != self.apf[0] != 'f':
-            self.opf = self.apf = 'f'+self.opf
+        self.opf = self.apf = 'fb'
 
     def reject_cosmic_rays(self):
         """
@@ -363,8 +362,7 @@ class Shiv(object):
             su.clean_cosmics( r, 'red' )
         self.log.info( '\nRemoved cosmic rays from the following files:\n'+',\n'.join(reds) )
 
-        if self.opf[0] != 'c':
-            self.opf = 'c'+self.opf
+        self.opf = 'cfb'
 
     def extract_object_spectra(self, side=['red','blue']):
         """
@@ -418,7 +416,7 @@ class Shiv(object):
                 else:
                     if 'blue' in reference:
                         # go ahead and simply use as a reference
-                        su.extract( fname, 'blue', reference=reference, interac=self.interactive )
+                        su.extract( fname, 'blue', reference=reference, interact=self.interactive )
                         self.log.info('Used ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
                     elif 'red' in reference:
                         # Need to pass along apfile and conversion factor to map the red extraction
@@ -507,9 +505,8 @@ class Shiv(object):
                 redarc = redarcs[0]
             su.disp_correct( self.opf+self.erroot%o[0], redarc )
             self.log.info("Applied wavelength solution from "+redarc+" to "+self.opf+self.erroot%o[0])
-        if self.opf[0] != 'd':
-            self.opf = 'd'+self.opf
-
+        self.opf = 'dcfb'
+    
     def flux_calibrate(self, side=None):
         """
         Determine and apply the relevant flux calibration to all objects.
