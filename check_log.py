@@ -6,7 +6,13 @@ import urllib
 import re
 import pyfits as pf
 from glob import glob
-from bs4 import BeautifulSoup
+# The names of these packages are different between my mac and my linux
+try:
+    from bs4 import BeautifulSoup
+except:
+    print 'Cannot locate package bs4, trying BeautifulSoup'
+    from BeautifulSoup import BeautifulSoup
+from difflib import SequenceMatcher
 from credentials import wiki_un, wiki_pw
 
 def wiki2log( pagename, outfile=None ):
@@ -184,6 +190,9 @@ def check_log( localfile=None, pagename=None, path_to_files=None ):
 
     if path_to_files != None:
         # go through each file and assert that it exists and is the type it's supposed to be
+        # Note that this checks whether the fits header says the lamps are on, but that can be incorrect
+        #  because observers sometimes switch the lamps on/off right after the observation ends (but before
+        #  the exposure is done reading out).
         for a in arcs:
             if a[1] == 1:
                 pre = 'b'
@@ -221,8 +230,26 @@ def check_log( localfile=None, pagename=None, path_to_files=None ):
                 pre = 'r'
             hdu = pf.open( path_to_files + '/%s%d.fits'%(pre, o[0]) )[0]
             if ('flat' in hdu.header['object'].lower()) or ('arc' in hdu.header['object'].lower()):
-                print 'Warning: %s%d.fits may not be a flat or an arc! (group ::: %d)'%(pre, o[0], o[2])
+                print 'Warning: %s%d.fits may not be an object! (group ::: %d)'%(pre, o[0], o[2])
+                print ' Log object name: %s ::: Fits file object name: %s' %(o[3], hdu.header['object'])
+                print
+            elif SequenceMatcher( a=o[3], b=hdu.header['object'] ).ratio() < 0.5:
+                print 'Warning: %s%d.fits may not be the correct object!'%(pre, o[0])
+                print ' Log object name: %s ::: Fits file object name: %s' %(o[3], hdu.header['object'])
+                print
             if [hdu.header[k] for k in hdu.header.keys() if 'LAMPSTA' in k].count('on') > 0:
-                raise Exception( 'Lamp on during object observation %s%d.fits!'%(pre, o[0]))
+                print 'Warning: lamp may have been on during object observation %s%d.fits!'%(pre, o[0])
 
     return True, warning
+
+if __name__ == '__main__':
+    from sys import argv,exit
+    try:
+        pagename = argv[1]
+        assert( type(pagename) == str )
+    except:
+        print 'Usage: check_log.py <wiki page ID>'
+        exit()
+    
+    success, warning = check_log( pagename )
+    
