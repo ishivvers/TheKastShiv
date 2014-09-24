@@ -233,7 +233,7 @@ def check_log( localfile=None, pagename=None, path_to_files=None ):
                 print 'Warning: %s%d.fits may not be an object! (group ::: %d)'%(pre, o[0], o[2])
                 print ' Log object name: %s ::: Fits file object name: %s' %(o[4], hdu.header['object'])
                 print
-            elif SequenceMatcher( a=o[3], b=hdu.header['object'] ).ratio() < 0.5:
+            elif SequenceMatcher( a=o[3].lower(), b=hdu.header['object'].lower() ).ratio() < 0.5:
                 print 'Warning: %s%d.fits may not be the correct object!'%(pre, o[0])
                 print ' Log object name: %s ::: Fits file object name: %s' %(o[4], hdu.header['object'])
                 print
