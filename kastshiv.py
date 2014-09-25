@@ -244,9 +244,15 @@ class Shiv(object):
             pagename = self.pagename
 
         if (logfile == None) and (dateUT != None or pagename != None):
+            # first check the wiki page
+            if not pagename:
+                date = date_parser.parse(datestring)
+                pagename = "%d_%.2d_kast_%s" %(date.month, date.day, self.runID)
+            check_log.check_log( pagename=pagename, path_to_files='../rawdata/' )
             self.objects, self.arcs, self.flats = su.wiki2elog( datestring=dateUT, runID=self.runID, outfile='%s.log'%self.runID, pagename=pagename  )
             su.populate_working_dir( self.runID, logfile='%s.log'%self.runID )
         elif logfile != None:
+            check_log.check_log( localfile=logfile, path_to_files='../rawdata/' )
             self.objects, self.arcs, self.flats = su.wiki2elog( datestring=dateUT, runID=self.runID, infile=logfile )
             su.populate_working_dir( self.runID, logfile=logfile )
         else:
