@@ -4,9 +4,8 @@ The Kast Shiv: a Kast spectrocscopic reduction pipeline
  pipeline and the B.Cenko pipeline - thanks everyone).
 
 to do: 
- - change file management at end, so finished files are moved
-    to ../final after fluxcal, and then we move to that folder
-    before running wombat
+ - have references algorithm match objects on blue side first,
+   then objects from red side
 
 """
 
@@ -15,6 +14,7 @@ import os
 import re
 import logging
 import pickle
+import check_log
 from glob import glob
 from copy import copy
 import numpy as np
@@ -248,10 +248,12 @@ class Shiv(object):
             if not pagename:
                 date = date_parser.parse(datestring)
                 pagename = "%d_%.2d_kast_%s" %(date.month, date.day, self.runID)
+            print 'Running log check...'
             check_log.check_log( pagename=pagename, path_to_files='../rawdata/' )
             self.objects, self.arcs, self.flats = su.wiki2elog( datestring=dateUT, runID=self.runID, outfile='%s.log'%self.runID, pagename=pagename  )
             su.populate_working_dir( self.runID, logfile='%s.log'%self.runID )
         elif logfile != None:
+            print 'Running log check...'
             check_log.check_log( localfile=logfile, path_to_files='../rawdata/' )
             self.objects, self.arcs, self.flats = su.wiki2elog( datestring=dateUT, runID=self.runID, infile=logfile )
             su.populate_working_dir( self.runID, logfile=logfile )
@@ -395,6 +397,13 @@ class Shiv(object):
                     su.extract( fname, 'red', interact=self.interactive )
                     self.log.info('Extracted '+fname)
                 else:
+                    while self.interactive:
+                        inn = raw_input( '\nUse %s as a reference for %s? (y/n)\n' %(reference, fname) )
+                        if 'y' in inn.lower():
+                            break
+                        elif 'n' in inn.lower():
+                            reference = None
+                            break
                     su.extract( fname, 'red', reference=reference )
                     self.log.info('Used ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
 
@@ -420,6 +429,13 @@ class Shiv(object):
                 if reference == None:
                     su.extract( fname, 'blue', interact=self.interactive )
                 else:
+                    while self.interactive:
+                        inn = raw_input( '\nUse %s as a reference for %s? (y/n)\n' %(reference, fname) )
+                        if 'y' in inn.lower():
+                            break
+                        elif 'n' in inn.lower():
+                            reference = None
+                            break
                     if 'blue' in reference:
                         # go ahead and simply use as a reference
                         su.extract( fname, 'blue', reference=reference, interact=self.interactive )
@@ -591,7 +607,7 @@ class Shiv(object):
                 # need to update the filename to show that it was averaged
                 # assumes that all were observed on the same day
                 f_timestr = re.search( '\.\d{3}', f ).group()
-                avg_time = mean( [float(re.search('\.\d{3}', fff).group()) for fff in bluematches] )
+                avg_time = np.mean( [float(re.search('\.\d{3}', fff).group()) for fff in bluematches] )
                 new_timestr = ('%.3f'%avg_time)[1:] #drop the leading 0
                 f = f.replace( f_timestr, new_timestr )
                 

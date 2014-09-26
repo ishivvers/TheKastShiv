@@ -582,24 +582,31 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None,
     else:
         raise StandardError( "side must be one of 'red','blue'" )
     
+    if interactive:
+        obj_name = pf.open(image)[0].header['object']
+        print 'Processing image %s \n Object: %s\n' %(image, obj_name)
+
     if (reference == None) & (arc == False) & (apfile == None):
+        print 'Extracting object; no reference.'
         iraf.apall(image, output=output, references='', interactive=interactive,
                    find=yes, recenter=yes, resize=yes, edit=yes, trace=yes,
                    fittrace=yes, extract=yes, extras=yes, review=yes,
                    background='fit', weights='variance', pfit='fit1d',
                    readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
                    ulimit=20, ylevel=0.01, b_sample="-35:-25,25:35", b_order=2,
-                   t_function="legendre", t_order=4, line=line_number )
+                   t_function="legendre", t_order=4, line=line_number, t_nlost=50 )
     elif (reference != None) & (arc == False):
         if not trace_only:
+            print 'Extracting object using reference.'
             iraf.apall(image, output=output, references=reference, interactive=interactive,
                        find=no, recenter=no, resize=no, edit=no, trace=yes,
                        fittrace=no, extract=yes, extras=yes, review=yes,
                        background='fit', weights='variance', pfit='fit1d',
                        readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
                        ulimit=20, ylevel=0.01, b_order=2,
-                       t_function="legendre", t_order=4, line=line_number )
+                       t_function="legendre", t_order=4, line=line_number, t_nlost=50 )
         else:
+            print 'Extracting object using reference for trace only.'
             iraf.apall(image, output=output, references=reference, interactive=interactive,
                        find=yes, recenter=yes, resize=yes, edit=yes, trace=yes,
                        fittrace=no, extract=yes, extras=yes, review=yes,
@@ -608,6 +615,7 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None,
                        ulimit=20, ylevel=0.01, b_order=2,
                        t_function="legendre", t_order=4, line=line_number )
     elif arc:
+        print 'Extracting arc.'
         iraf.apall(image, output=output, references=reference, interactive=no,
                    find=no, recenter=no, resize=no, edit=no, trace=no, fittrace=no,
                    extract=yes, extras=yes, review=no, background='none',
@@ -616,13 +624,14 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None,
         ap, lbg, rbg = parse_apfile( apfile )
         if apfact == None:
             apfact = 1.0
+        print 'Extracting object using reference apfile.'
         iraf.apall(image, output=output, references='', interactive=interactive,
-                   find=no, recenter=no, resize=no, edit=yes, trace=yes,
+                   find=yes, recenter=no, resize=no, edit=yes, trace=yes,
                    fittrace=yes, extract=yes, extras=yes, review=yes,
                    background='fit',  b_order=2, weights='variance', pfit='fit1d',
                    readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
                    ulimit=20, ylevel=0.01, t_function="legendre", t_order=4,
-                   lower=ap[0]*apfact, upper=ap[1]*apfact, line=line_number,
+                   lower=ap[0]*apfact, upper=ap[1]*apfact, line=line_number, t_nlost=50,
                    b_sample="%.2f:%.2f,%.2f:%.2f" %(lbg[0]*apfact, lbg[1]*apfact, rbg[0]*apfact, rbg[1]*apfact) )
     else:
         raise StandardError( "unacceptable keyword combination" )
