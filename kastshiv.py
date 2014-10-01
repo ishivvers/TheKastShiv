@@ -85,7 +85,7 @@ class Shiv(object):
         self.current_step +=1
         print 'next:',self.steps[self.current_step].__name__
 
-    def go_to_step(self, step=None):
+    def go_to(self, step=None):
         """
         Go to a specific step.  If step number is given, goes there, otherwise
          requires interaction.
@@ -100,6 +100,22 @@ class Shiv(object):
                 print i,':::',s.__name__
             self.current_step = int(raw_input())
             self.summary()
+        # handle the prefixes properly
+        if self.current_step <= 5:
+            self.opf = self.apf = self.fpf = ''
+        elif 5 < self.current_step <= 9:
+            self.opf = self.apf = self.fpf = 'b'
+        elif 8 < self.current_step <= 9 :
+            self.fpf = 'b'
+            self.opf = self.apf = 'fb'
+        elif 9 < self.current_step <= 13:
+            self.fpf = 'b'
+            self.opf = 'cfb'
+            self.apf = 'fb'
+        elif 13 < self.current_step:
+            self.fpf = 'b'
+            self.opf = 'cfb'
+            self.opf = 'dcfb'
 
     def save(self):
         """
@@ -274,7 +290,7 @@ class Shiv(object):
         self.broot = '%sblue'%self.runID + '%.3d.fits'
         self.erroot = self.rroot.replace('.fits','.ms.fits') # after extraction
         self.ebroot = self.broot.replace('.fits','.ms.fits')
-        # define the prefix for current file names
+        # define the prefixes for current file names
         self.opf = ''  # object
         self.fpf = ''  # flat
         self.apf = ''  # arc
@@ -288,7 +304,8 @@ class Shiv(object):
         #  using the first red and blue flats
         self.b_ytrim = su.find_trim_sec( self.apf+self.broot%self.bflats[0][0], plot=self.interactive )
         self.r_ytrim = su.find_trim_sec( self.apf+self.rroot%self.rflats[0][0], plot=self.interactive )
-        self.log.info( '\nBlue trim section: (%.4f, %.4f) \nRed trim section: (%.4f, %.4f)'%(self.b_ytrim[0], self.b_ytrim[1], self.r_ytrim[0], self.r_ytrim[0]) )
+        self.log.info( '\nBlue trim section: (%.4f, %.4f) \nRed trim section: (%.4f, %.4f)'%(self.b_ytrim[0],
+                                                           self.b_ytrim[1], self.r_ytrim[0], self.r_ytrim[0]) )
 
     def trim_and_bias_correct(self):
         """
@@ -302,7 +319,7 @@ class Shiv(object):
         reds = [self.opf+self.rroot%o[0] for o in self.robjects+self.rflats+self.rarcs]
         su.bias_correct( reds, self.r_ytrim[0], self.r_ytrim[1] )
 
-        self.opf = self.fpf = self.apf = 'b'
+        self.opf = self.fpf = self.apf = 'b' # b for bias-subtracted
         self.log.info( '\nApplied trim section (%.4f, %.4f) to following files:\n'%(self.b_ytrim[0], self.b_ytrim[1])+',\n'.join(blues) )
         self.log.info( '\nApplied trim section (%.4f, %.4f) to following files:\n'%(self.r_ytrim[0], self.r_ytrim[1])+',\n'.join(reds) )
 
@@ -354,7 +371,7 @@ class Shiv(object):
                 su.apply_flat( reds, 'nflat%d'%i )
                 self.log.info( '\nApplied flat nflat%d to the following files:\n'%i+',\n'.join(reds) )
 
-        self.opf = self.apf = 'fb'
+        self.opf = self.apf = 'fb' # f for flatfielded
 
     def reject_cosmic_rays(self):
         """
@@ -370,7 +387,7 @@ class Shiv(object):
             su.clean_cosmics( r, 'red' )
         self.log.info( '\nRemoved cosmic rays from the following files:\n'+',\n'.join(reds) )
 
-        self.opf = 'cfb'
+        self.opf = 'cfb'  # c for cosmic-ray removal
 
     def extract_object_spectra(self, side=['red','blue']):
         """
@@ -527,7 +544,7 @@ class Shiv(object):
                 redarc = redarcs[0]
             su.disp_correct( self.opf+self.erroot%o[0], redarc )
             self.log.info("Applied wavelength solution from "+redarc+" to "+self.opf+self.erroot%o[0])
-        self.opf = 'dcfb'
+        self.opf = 'dcfb' # d for dispersion-corrected
     
     def flux_calibrate(self, side=None):
         """

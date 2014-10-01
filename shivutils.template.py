@@ -489,9 +489,13 @@ def combine_arcs( arcs, output ):
     """
     simply combine a set of arc images into a single image
     """
+    # make sure the file doesn't already exist
+    try:
+        run_cmd( 'rm ' + output )
+        sleep(1)  # have to wait a bit for this to go through!
+    except:
+        pass
     iraf.imarith( arcs[0], '+', arcs[1], output )
-    for i in range(2,len(arcs)):
-        iraf.imarith( output, '+', arcs[i], output )
 
 ############################################################################
 
