@@ -3,10 +3,6 @@ The Kast Shiv: a Kast spectrocscopic reduction pipeline
  written by I.Shivvers (modified from the K.Clubb/J.Silverman/T.Matheson
  pipeline and the B.Cenko pipeline - thanks everyone).
 
-to do: 
- - have references algorithm match objects on blue side first,
-   then objects from red side
-
 """
 
 import shivutils as su
@@ -64,8 +60,7 @@ class Shiv(object):
                       self.coadd_join_output]
         self.current_step = 0
 
-        self.extracted_objects = []  #used to keep track of multiple observations of the same object
-        self.extracted_images = []
+        self.extracted_images = [[],[]]  #used to keep track of multiple observations of the same object
 
     def __iter__(self):
         return self
@@ -221,6 +216,7 @@ class Shiv(object):
         self.bflats = [f for f in self.flats if f[1]==1]
         self.rarcs = [a for a in self.arcs if a[1]==2]
         self.barcs = [a for a in self.arcs if a[1]==1]
+        
 
     ################################################################
 
@@ -399,33 +395,37 @@ class Shiv(object):
             for o in self.robjects:
                 fname = self.opf+self.rroot%o[0]
                 # If we've already extracted this exact file, move on.
-                if fname in self.extracted_images:
+                if fname in self.extracted_images[0]:
                     print fname,'has already been extracted. Remove from self.extracted_images '+\
                                 'list if you want to run it again.'
                     continue
-                # If we've already extracted a spectrum of this object, use the first extraction
-                #  as a reference.
-                try:
-                    reference = self.extracted_images[ self.extracted_objects.index( o[4] ) ]
-                except ValueError:
+                # If we've already extracted a spectrum of this object, use it as a reference
+                irefs = [ i for i in range(len(self.extracted_images[0])) if self.extracted_images[1][i]==o[4] ]
+                if len(irefs) == 0
                     reference = None
-
+                else:
+                    iref = 0
+                    while self.interactive:
+                        inn = raw_input( '\nUse %s as a reference for %s? (y/n)\n' %(self.extracted_images[0][iref], fname) )
+                        if 'y' in inn.lower():
+                            break
+                        else:
+                            iref += 1
+                        if iref => len(irefs):
+                            inn = raw_input( '\nEnter n to use to references, anything else to try again\n' )
+                            if 'n' in inn.lower():
+                                break
+                    reference = self.extracted_images[0][iref]
+                
                 if reference == None:
                     su.extract( fname, 'red', interact=self.interactive )
                     self.log.info('Extracted '+fname)
                 else:
-                    while self.interactive:
-                        inn = raw_input( '\nUse %s as a reference for %s? (y/n)\n' %(reference, fname) )
-                        if 'y' in inn.lower():
-                            break
-                        elif 'n' in inn.lower():
-                            reference = None
-                            break
                     su.extract( fname, 'red', reference=reference )
                     self.log.info('Used ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
 
-                self.extracted_objects.append( o[4] )
-                self.extracted_images.append( fname )
+                self.extracted_images[0].append( fname )
+                self.extracted_images[1].append( o[4] )
                 self.save()
         # extract all blue objects on the second pass
         if 'blue' in side:
@@ -436,23 +436,28 @@ class Shiv(object):
                     print fname,'has already been extracted. Remove from self.extracted_images '+\
                                 'list if you want to run it again.'
                     continue
-                # If we've already extracted a spectrum of this object, use the first extraction
-                #  as a reference or apfile reference (accounting for differences in blue and red pixel scales).
-                try:
-                    reference = self.extracted_images[ self.extracted_objects.index( o[4] ) ]
-                except ValueError:
+                # If we've already extracted a spectrum of this object, use a reference
+                #  or apfile reference (accounting for differences in blue and red pixel scales).
+                irefs = [ i for i in range(len(self.extracted_images[0])) if self.extracted_images[1][i]==o[4] ]
+                if len(irefs) == 0
                     reference = None
+                else:
+                    iref = 0
+                    while self.interactive:
+                        inn = raw_input( '\nUse %s as a reference for %s? (y/n)\n' %(self.extracted_images[0][iref], fname) )
+                        if 'y' in inn.lower():
+                            break
+                        else:
+                            iref += 1
+                        if iref => len(irefs):
+                            inn = raw_input( '\nEnter n to use to references, anything else to try again\n' )
+                            if 'n' in inn.lower():
+                                break
+                    reference = self.extracted_images[0][iref]
 
                 if reference == None:
                     su.extract( fname, 'blue', interact=self.interactive )
                 else:
-                    while self.interactive:
-                        inn = raw_input( '\nUse %s as a reference for %s? (y/n)\n' %(reference, fname) )
-                        if 'y' in inn.lower():
-                            break
-                        elif 'n' in inn.lower():
-                            reference = None
-                            break
                     if 'blue' in reference:
                         # go ahead and simply use as a reference
                         su.extract( fname, 'blue', reference=reference, interact=self.interactive )
