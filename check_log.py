@@ -1,8 +1,12 @@
 """
 A python script to check an online wiki e-log for proper format.
+Also includes a log-scanning function, which queries every log page 
+ on the wiki and creates a dictionary of all of the observations
+ taken per object.
 """
 
 import urllib
+import pickle
 import re
 import pyfits as pf
 from glob import glob
@@ -12,8 +16,121 @@ try:
 except:
     print 'Cannot locate package bs4, trying BeautifulSoup'
     from BeautifulSoup import BeautifulSoup
-from difflib import SequenceMatcher
+from difflib import SequenceMatcher, get_close_matches
+from datetime import date
 from credentials import wiki_un, wiki_pw
+
+def get_all_logs( savefile=None ):
+    """
+    Searches all wiki logs for all observed objects, and produces
+     a dictionary where the keys are the observed objects and the
+     values are lists of pages that indicate they were observed.
+     Only registers properly-formatted pages.
+    """
+    base = 'http://hercules.berkeley.edu/wiki/doku.php?id='
+    main = 'start'
+    archive = 'past_years_logs'
+    creds = urllib.urlencode({"u" : wiki_un, "p" : wiki_pw})
+
+    outdict = {}
+
+    # do all of the links from this year
+    page = urllib.urlopen(base+main,creds).read()
+    t = page.split('Night Summaries, Logs, and Quicklooks')[2]
+    # process out the page IDs
+    pageids = re.findall('title="\d+_\d+.+"', t)
+    pageids = [re.search('\d+_\d+[^"]+', row).group() for row in pageids if 'nofollow' not in row]
+
+    # now go through all of these pages and parse them
+    for pid in pageids:
+        try:
+            o,a,f = wiki2log( pid )
+        except:
+            print 'Cannot open',pid
+            continue
+        names = [oo[-1] for oo in o]
+        for n in names:
+            if n not in outdict.keys():
+                outdict[n] = []
+            outdict[n].append(pid)
+
+    # do all of the links from past years
+    page = urllib.urlopen(base+archive,creds).read()
+    pageids = re.findall('title="\d+_\d+.+"', page)
+    pageids = [re.search('\d+_\d+[^"]+', row).group() for row in pageids if 'nofollow' not in row]
+
+    # now go through all of these pages and parse them
+    for pid in pageids:
+        try:
+            o,a,f = wiki2log( pid )
+        except:
+            print 'Cannot open',pid
+            continue
+        names = [oo[-1] for oo in o]
+        for n in names:
+            if n not in outdict.keys():
+                outdict[n] = []
+            outdict[n].append(pid)
+
+    if savefile != None:
+        pickle.dump(outdict, open(savefile,'w'))
+        print 'pickled to',savefile
+    return outdict
+
+def search_wiki_for( regex, start=None, end=None ):
+    """
+    Search all wiki pages for matches to the given regular expression.
+    Takes several minutes to scan all pages.
+    If start or end given (integer years) then limits search to those
+     ranges (inclusive).
+    """
+    base = 'http://hercules.berkeley.edu/wiki/doku.php?id='
+    main = 'start'
+    archive = 'past_years_logs'
+    creds = urllib.urlencode({"u" : wiki_un, "p" : wiki_pw})
+
+    # record all of the links from this year
+    print 'opening',main
+    page = urllib.urlopen(base+main,creds).read()
+    t = page.split('Night Summaries, Logs, and Quicklooks')[2]
+    # process out the page IDs
+    pageids = re.findall('title="\d+_\d+.+"', t)
+    pageids = [re.search('\d+_\d+[^"]+', row).group() for row in pageids if 'nofollow' not in row]
+    all_links = { date.today().year: pageids }
+
+    # record all links from past years
+    print 'opening',archive
+    page = urllib.urlopen(base+archive,creds).read()
+    page = page.split('<!-- TOC END -->')[1].split('<!-- wikipage stop -->')[0]
+    year = date.today().year
+    while True:
+        if not re.search( str(year), page ):
+            break
+        t = page.split( str(year) )[1]
+        pageids = re.findall('title="\d+_\d+.+"', t)
+        pageids = [re.search('\d+_\d+[^"]+', row).group() for row in pageids if 'nofollow' not in row]
+        if year in all_links.keys():
+            all_links[ year ] += pageids
+        else:
+            all_links[ year ] = pageids
+        year -= 1
+
+    years = all_links.keys()
+    if start != None:
+        years = [y for y in years if y >= start]
+    if end != None:
+        years = [y for y in years if y <= end]
+
+    found_in = []
+    for year in years:
+        print '\nsearching %d\n\n'%year
+        for pid in all_links[year]:
+            print 'searching',pid
+            page = urllib.urlopen(base+pid,creds).read()
+            if re.search(regex, page):
+                found_in.append( (year,pid) )
+
+    return found_in
 
 def wiki2log( pagename, outfile=None ):
     """
