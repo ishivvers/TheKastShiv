@@ -3,12 +3,6 @@ The Kast Shiv: a Kast spectrocscopic reduction pipeline
  written by I.Shivvers (modified from the K.Clubb/J.Silverman/T.Matheson
  pipeline and the B.Cenko pipeline - thanks everyone).
 
-to do: 
- - have references algorithm match objects on blue side first,
-   then objects from red side.
- - if object associated with 0.5" arcs is dropped, raises
-   an error.
-
 """
 
 import shivutils as su
@@ -66,8 +60,7 @@ class Shiv(object):
                       self.coadd_join_output]
         self.current_step = 0
 
-        self.extracted_objects = []  #used to keep track of multiple observations of the same object
-        self.extracted_images = []
+        self.extracted_images = [[],[]]  #used to keep track of multiple observations of the same object
 
     def __iter__(self):
         return self
@@ -87,7 +80,7 @@ class Shiv(object):
         self.current_step +=1
         print 'next:',self.steps[self.current_step].__name__
 
-    def go_to_step(self, step=None):
+    def go_to(self, step=None):
         """
         Go to a specific step.  If step number is given, goes there, otherwise
          requires interaction.
@@ -102,6 +95,22 @@ class Shiv(object):
                 print i,':::',s.__name__
             self.current_step = int(raw_input())
             self.summary()
+        # handle the prefixes properly
+        if self.current_step <= 5:
+            self.opf = self.apf = self.fpf = ''
+        elif 5 < self.current_step <= 9:
+            self.opf = self.apf = self.fpf = 'b'
+        elif 8 < self.current_step <= 9 :
+            self.fpf = 'b'
+            self.opf = self.apf = 'fb'
+        elif 9 < self.current_step <= 13:
+            self.fpf = 'b'
+            self.opf = 'cfb'
+            self.apf = 'fb'
+        elif 13 < self.current_step:
+            self.fpf = 'b'
+            self.opf = 'cfb'
+            self.opf = 'dcfb'
 
     def save(self):
         """
@@ -207,6 +216,7 @@ class Shiv(object):
         self.bflats = [f for f in self.flats if f[1]==1]
         self.rarcs = [a for a in self.arcs if a[1]==2]
         self.barcs = [a for a in self.arcs if a[1]==1]
+        
 
     ################################################################
 
@@ -276,7 +286,7 @@ class Shiv(object):
         self.broot = '%sblue'%self.runID + '%.3d.fits'
         self.erroot = self.rroot.replace('.fits','.ms.fits') # after extraction
         self.ebroot = self.broot.replace('.fits','.ms.fits')
-        # define the prefix for current file names
+        # define the prefixes for current file names
         self.opf = ''  # object
         self.fpf = ''  # flat
         self.apf = ''  # arc
@@ -290,7 +300,8 @@ class Shiv(object):
         #  using the first red and blue flats
         self.b_ytrim = su.find_trim_sec( self.apf+self.broot%self.bflats[0][0], plot=self.interactive )
         self.r_ytrim = su.find_trim_sec( self.apf+self.rroot%self.rflats[0][0], plot=self.interactive )
-        self.log.info( '\nBlue trim section: (%.4f, %.4f) \nRed trim section: (%.4f, %.4f)'%(self.b_ytrim[0], self.b_ytrim[1], self.r_ytrim[0], self.r_ytrim[0]) )
+        self.log.info( '\nBlue trim section: (%.4f, %.4f) \nRed trim section: (%.4f, %.4f)'%(self.b_ytrim[0],
+                                                           self.b_ytrim[1], self.r_ytrim[0], self.r_ytrim[0]) )
 
     def trim_and_bias_correct(self):
         """
@@ -304,7 +315,7 @@ class Shiv(object):
         reds = [self.opf+self.rroot%o[0] for o in self.robjects+self.rflats+self.rarcs]
         su.bias_correct( reds, self.r_ytrim[0], self.r_ytrim[1] )
 
-        self.opf = self.fpf = self.apf = 'b'
+        self.opf = self.fpf = self.apf = 'b' # b for bias-subtracted
         self.log.info( '\nApplied trim section (%.4f, %.4f) to following files:\n'%(self.b_ytrim[0], self.b_ytrim[1])+',\n'.join(blues) )
         self.log.info( '\nApplied trim section (%.4f, %.4f) to following files:\n'%(self.r_ytrim[0], self.r_ytrim[1])+',\n'.join(reds) )
 
@@ -356,7 +367,7 @@ class Shiv(object):
                 su.apply_flat( reds, 'nflat%d'%i )
                 self.log.info( '\nApplied flat nflat%d to the following files:\n'%i+',\n'.join(reds) )
 
-        self.opf = self.apf = 'fb'
+        self.opf = self.apf = 'fb' # f for flatfielded
 
     def reject_cosmic_rays(self):
         """
@@ -372,7 +383,7 @@ class Shiv(object):
             su.clean_cosmics( r, 'red' )
         self.log.info( '\nRemoved cosmic rays from the following files:\n'+',\n'.join(reds) )
 
-        self.opf = 'cfb'
+        self.opf = 'cfb'  # c for cosmic-ray removal
 
     def extract_object_spectra(self, side=['red','blue']):
         """
@@ -384,24 +395,28 @@ class Shiv(object):
             for o in self.robjects:
                 fname = self.opf+self.rroot%o[0]
                 # If we've already extracted this exact file, move on.
-                if fname in self.extracted_images:
+                if fname in self.extracted_images[0]:
                     print fname,'has already been extracted. Remove from self.extracted_images '+\
                                 'list if you want to run it again.'
                     continue
-                # If we've already extracted a spectrum of this object, use the first extraction
-                #  as a reference.
-                try:
-                    reference = self.extracted_images[ self.extracted_objects.index( o[4] ) ]
+                # If we've already extracted a spectrum of this object, use it as a reference
+                irefs = [ i for i in range(len(self.extracted_images[0])) if self.extracted_images[1][i]==o[4] ]
+                if len(irefs) == 0
+                    reference = None
+                else:
+                    iref = 0
                     while self.interactive:
-                        inn = raw_input( '\nUse %s as a reference for %s? (y/n)\n' %(reference, fname) )
+                        inn = raw_input( '\nUse %s as a reference for %s? (y/n)\n' %(self.extracted_images[0][iref], fname) )
                         if 'y' in inn.lower():
                             break
-                        elif 'n' in inn.lower():
-                            reference = None
-                            break
-                except ValueError:
-                    reference = None
-
+                        else:
+                            iref += 1
+                        if iref => len(irefs):
+                            inn = raw_input( '\nEnter n to use to references, anything else to try again\n' )
+                            if 'n' in inn.lower():
+                                break
+                    reference = self.extracted_images[0][iref]
+                
                 if reference == None:
                     su.extract( fname, 'red', interact=self.interactive )
                     self.log.info('Extracted '+fname)
@@ -409,8 +424,8 @@ class Shiv(object):
                     su.extract( fname, 'red', reference=reference )
                     self.log.info('Used ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
 
-                self.extracted_objects.append( o[4] )
-                self.extracted_images.append( fname )
+                self.extracted_images[0].append( fname )
+                self.extracted_images[1].append( o[4] )
                 self.save()
         # extract all blue objects on the second pass
         if 'blue' in side:
@@ -421,19 +436,24 @@ class Shiv(object):
                     print fname,'has already been extracted. Remove from self.extracted_images '+\
                                 'list if you want to run it again.'
                     continue
-                # If we've already extracted a spectrum of this object, use the first extraction
-                #  as a reference or apfile reference (accounting for differences in blue and red pixel scales).
-                try:
-                    reference = self.extracted_images[ self.extracted_objects.index( o[4] ) ]
+                # If we've already extracted a spectrum of this object, use a reference
+                #  or apfile reference (accounting for differences in blue and red pixel scales).
+                irefs = [ i for i in range(len(self.extracted_images[0])) if self.extracted_images[1][i]==o[4] ]
+                if len(irefs) == 0
+                    reference = None
+                else:
+                    iref = 0
                     while self.interactive:
-                        inn = raw_input( '\nUse %s as a reference for %s? (y/n)\n' %(reference, fname) )
+                        inn = raw_input( '\nUse %s as a reference for %s? (y/n)\n' %(self.extracted_images[0][iref], fname) )
                         if 'y' in inn.lower():
                             break
-                        elif 'n' in inn.lower():
-                            reference = None
-                            break
-                except ValueError:
-                    reference = None
+                        else:
+                            iref += 1
+                        if iref => len(irefs):
+                            inn = raw_input( '\nEnter n to use to references, anything else to try again\n' )
+                            if 'n' in inn.lower():
+                                break
+                    reference = self.extracted_images[0][iref]
 
                 if reference == None:
                     su.extract( fname, 'blue', interact=self.interactive )
@@ -529,7 +549,7 @@ class Shiv(object):
                 redarc = redarcs[0]
             su.disp_correct( self.opf+self.erroot%o[0], redarc )
             self.log.info("Applied wavelength solution from "+redarc+" to "+self.opf+self.erroot%o[0])
-        self.opf = 'dcfb'
+        self.opf = 'dcfb' # d for dispersion-corrected
     
     def flux_calibrate(self, side=None):
         """
