@@ -77,13 +77,15 @@ def get_all_logs( savefile=None ):
         print 'pickled to',savefile
     return outdict
 
-def search_wiki_for( regex, start=None, end=None ):
+def search_wiki_for( regexes, start=None, end=None ):
     """
-    Search all wiki pages for matches to the given regular expression.
+    Search all wiki pages for matches to the given regular expression[s].
     Takes several minutes to scan all pages.
     If start or end given (integer years) then limits search to those
      ranges (inclusive).
     """
+    if type(regexes) != list:
+        regexes = [regexes]
     base = 'http://hercules.berkeley.edu/wiki/doku.php?id='
     main = 'start'
     archive = 'past_years_logs'
@@ -127,8 +129,9 @@ def search_wiki_for( regex, start=None, end=None ):
         for pid in all_links[year]:
             print 'searching',pid
             page = urllib.urlopen(base+pid,creds).read()
-            if re.search(regex, page):
-                found_in.append( (year,pid) )
+            for regex in regexes:
+                if re.search(regex, page):
+                    found_in.append( (regex,year,pid) )
 
     return found_in
 
