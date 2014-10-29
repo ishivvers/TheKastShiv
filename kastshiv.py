@@ -5,7 +5,9 @@ The Kast Shiv: a Kast spectrocscopic reduction pipeline
 
 to do: 
  - have references algorithm match objects on blue side first,
-   then objects from red side
+   then objects from red side.
+ - if object associated with 0.5" arcs is dropped, raises
+   an error.
 
 """
 
@@ -390,13 +392,6 @@ class Shiv(object):
                 #  as a reference.
                 try:
                     reference = self.extracted_images[ self.extracted_objects.index( o[4] ) ]
-                except ValueError:
-                    reference = None
-
-                if reference == None:
-                    su.extract( fname, 'red', interact=self.interactive )
-                    self.log.info('Extracted '+fname)
-                else:
                     while self.interactive:
                         inn = raw_input( '\nUse %s as a reference for %s? (y/n)\n' %(reference, fname) )
                         if 'y' in inn.lower():
@@ -404,6 +399,13 @@ class Shiv(object):
                         elif 'n' in inn.lower():
                             reference = None
                             break
+                except ValueError:
+                    reference = None
+
+                if reference == None:
+                    su.extract( fname, 'red', interact=self.interactive )
+                    self.log.info('Extracted '+fname)
+                else:
                     su.extract( fname, 'red', reference=reference )
                     self.log.info('Used ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
 
@@ -423,12 +425,6 @@ class Shiv(object):
                 #  as a reference or apfile reference (accounting for differences in blue and red pixel scales).
                 try:
                     reference = self.extracted_images[ self.extracted_objects.index( o[4] ) ]
-                except ValueError:
-                    reference = None
-
-                if reference == None:
-                    su.extract( fname, 'blue', interact=self.interactive )
-                else:
                     while self.interactive:
                         inn = raw_input( '\nUse %s as a reference for %s? (y/n)\n' %(reference, fname) )
                         if 'y' in inn.lower():
@@ -436,6 +432,12 @@ class Shiv(object):
                         elif 'n' in inn.lower():
                             reference = None
                             break
+                except ValueError:
+                    reference = None
+
+                if reference == None:
+                    su.extract( fname, 'blue', interact=self.interactive )
+                else:
                     if 'blue' in reference:
                         # go ahead and simply use as a reference
                         su.extract( fname, 'blue', reference=reference, interact=self.interactive )
