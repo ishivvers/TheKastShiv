@@ -8,6 +8,8 @@ Steals heavily from Brad Cenko's kast_redux and iqutils packages,
 as well as the SilverClubb reduction pipeline.
 (Thanks Brad, Jeff, and Kelsey!)
 
+Best if run using the Ureka Python setup:
+http://ssb.stsci.edu/ureka/
 
 Notes:
  - the scipy.signal.argrelmin function may be helpful to find
