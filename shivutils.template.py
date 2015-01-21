@@ -889,6 +889,8 @@ def join( spec1, spec2, scaleside=1, interactive=True ):
     # calculate the overlap masks
     m1 = spec1[0] >= spec2[0][0]
     m2 = spec1[0][-1] >= spec2[0]
+    if sum(m1)==sum(m2)==0:
+        raise Exception('No overlap!')
     if interactive:
         # let the user choose a different range
         plt.figure()
