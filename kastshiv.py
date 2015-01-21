@@ -3,6 +3,10 @@ The Kast Shiv: a Kast spectrocscopic reduction pipeline
  written by I.Shivvers (modified from the K.Clubb/J.Silverman/T.Matheson
  pipeline and the B.Cenko pipeline - thanks everyone).
 
+NOTE:
+some weirdnesses when associating blue files with red ones.  looks like it tries
+ to match to the very first red file first, and then (maybe) uses the correct
+ apfile?
 """
 
 import shivutils as su
@@ -401,7 +405,7 @@ class Shiv(object):
                     continue
                 # If we've already extracted a spectrum of this object, use it as a reference
                 irefs = [ i for i in range(len(self.extracted_images[0])) if self.extracted_images[1][i]==o[4] ]
-                if len(irefs) == 0
+                if len(irefs) == 0:
                     reference = None
                 else:
                     iref = 0
@@ -411,7 +415,7 @@ class Shiv(object):
                             break
                         else:
                             iref += 1
-                        if iref => len(irefs):
+                        if iref >= len(irefs):
                             inn = raw_input( '\nEnter n to use to references, anything else to try again\n' )
                             if 'n' in inn.lower():
                                 break
@@ -439,7 +443,7 @@ class Shiv(object):
                 # If we've already extracted a spectrum of this object, use a reference
                 #  or apfile reference (accounting for differences in blue and red pixel scales).
                 irefs = [ i for i in range(len(self.extracted_images[0])) if self.extracted_images[1][i]==o[4] ]
-                if len(irefs) == 0
+                if len(irefs) == 0:
                     reference = None
                 else:
                     iref = 0
@@ -449,7 +453,7 @@ class Shiv(object):
                             break
                         else:
                             iref += 1
-                        if iref => len(irefs):
+                        if iref >= len(irefs):
                             inn = raw_input( '\nEnter n to use to references, anything else to try again\n' )
                             if 'n' in inn.lower():
                                 break
@@ -470,8 +474,8 @@ class Shiv(object):
                         self.log.info('Used apfiles from ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
                     else:
                         raise StandardError( 'We have a situation with aperature referencing.' )
-                self.extracted_objects.append( o[4] )
-                self.extracted_images.append( fname )
+                self.extracted_images[0].append( fname )
+                self.extracted_images[1].append( o[4] )
                 self.save()
 
     def extract_arc_spectra(self):
