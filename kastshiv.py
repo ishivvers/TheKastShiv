@@ -421,22 +421,26 @@ class Shiv(object):
                 if len(irefs) == 0:
                     reference = None
                 else:
-                    reference = self.extracted_images[0][irefs[0]][0]
+                    reference = self.extracted_images[0][irefs[0]]
 
                 # if we're interactive, give the user some choice here
                 if self.interactive:
                     for iref in irefs:
-                        inn = raw_input( '\nUse %s as a reference for %s? (y/n)\n' %(self.extracted_images[0][iref][0], fname) )
+                        reference = self.extracted_images[0][iref]
+                        print
+                        print fname,':::',o[-1]
+                        print reference[0],':::',reference[1]
+                        inn = raw_input( 'Use %s as a reference for %s? (y/n)\n' %(reference[0], fname) )
                         if 'y' in inn.lower():
-                            reference = self.extracted_images[0][iref][0]
                             break
+                        reference = None
                 
                 if reference == None:
                     su.extract( fname, 'red', interact=self.interactive )
                     self.log.info('Extracted '+fname)
                 else:
-                    su.extract( fname, 'red', reference=reference )
-                    self.log.info('Used ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
+                    su.extract( fname, 'red', reference=reference[0] )
+                    self.log.info('Used ' + reference[0] + ' for reference on '+ fname +' (objects: '+reference[1]+' ::: '+o[4]+')')
 
                 self.extracted_images[0].append( [fname,o[4]] )
                 self.save()
@@ -458,42 +462,49 @@ class Shiv(object):
                     reference = None
                 elif len(blue_irefs) != 0:
                     # default to the first blue image 
-                    reference = self.extracted_images[1][blue_irefs[0]][0]
+                    reference = self.extracted_images[1][blue_irefs[0]]
                 else:
-                    reference = self.extracted_images[0][red_irefs[0]][0]
+                    reference = self.extracted_images[0][red_irefs[0]]
                 
                 # if we're interactive, give the user some choice here
                 if self.interactive:
+                    blueref = False
                     # choose from blue references first
                     for iref in blue_irefs:
-                        reference = self.extracted_images[1][iref][0]
-                        inn = raw_input( '\nUse %s as a reference for %s? (y/n)\n' %(reference, fname) )
+                        reference = self.extracted_images[1][iref]
+                        print
+                        print fname,':::',o[-1]
+                        print reference[0],':::',reference[1]
+                        inn = raw_input( 'Use %s as a reference for %s? (y/n)\n' %(reference[0], fname) )
                         if 'y' in inn.lower():
                             blueref = True
                             break
                         reference = None
-                    # next try the reds
-                    for iref in red_irefs:
-                        reference = self.extracted_images[0][iref][0]
-                        inn = raw_input( '\nUse %s as a reference for %s? (y/n)\n' %(reference, fname) )
-                        if 'y' in inn.lower():
-                            blueref = False
-                            break
-                        reference = None
+                    if not blueref:
+                        # next try the reds
+                        for iref in red_irefs:
+                            reference = self.extracted_images[0][iref]
+                            print
+                            print fname,':::',o[-1]
+                            print reference[0],' :::',reference[1]
+                            inn = raw_input( 'Use %s as a reference for %s? (y/n)\n' %(reference[0], fname) )
+                            if 'y' in inn.lower():
+                                break
+                            reference = None
 
                 if reference == None:
                     su.extract( fname, 'blue', interact=self.interactive )
                 else:
                     if blueref:
                         # go ahead and simply use as a reference
-                        su.extract( fname, 'blue', reference=reference, interact=self.interactive )
-                        self.log.info('Used ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
+                        su.extract( fname, 'blue', reference=reference[0], interact=self.interactive )
+                        self.log.info('Used ' + reference[0] + ' for reference on '+ fname +' (objects: '+reference[1]+' ::: '+o[4]+')')
                     else:
                         # Need to pass along apfile and conversion factor to map the red extraction
                         #  onto this blue image. Blue CCD has a plate scale 1.8558 times larger than the red.
-                        apfile = 'database/ap'+reference.strip('.fits')
-                        su.extract( fname, 'blue', apfile=apfile, apfact=1.8558, interact=self.interactive )
-                        self.log.info('Used apfiles from ' + reference + ' for reference on '+ fname +' (object: '+o[4]+')')
+                        apfile = 'database/ap'+reference[0].strip('.fits')
+                        su.extract( fname, 'blue', apfile=apfile, interact=self.interactive )
+                        self.log.info('Used apfiles from ' + reference[0] + ' for reference on '+ fname +' (objects: '+reference[1]+' ::: '+o[4]+')')
 
                 self.extracted_images[1].append( [fname,o[4]] )
                 self.save()
