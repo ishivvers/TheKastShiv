@@ -698,6 +698,8 @@ def extract( image, side, arc=False, interact=True, reference=None, trace_only=F
         ap_params['edit']        = no
         ap_params['trace']       = no
         ap_params['fittrace']    = no
+        ap_params['background']  = 'none'
+
 
     elif (apfile != None):
         ap, lbg, rbg = parse_apfile( apfile )
@@ -911,7 +913,7 @@ def read_calfits( f ):
 
 ######################################################################
 
-def coadd( files, weights='exptime' ):
+def coadd( files ):
     """
     Reads in a list of fits file namess (file formats as expected from flux-calibrated
      spectra, after using the IDL routine cal.pro).
@@ -919,7 +921,6 @@ def coadd( files, weights='exptime' ):
      arrays are different will interpolate all spectra onto the region covered
      by all input spectra, rebinning all data to the same resolution first if needed
      (using the resolution of the lowest-resolution spectrum).
-    weights can be one of ['equal', 'exptime']
     Returns numpy arrays of wavelength, flux, and error.
     """
     hdus = [pf.open(f) for f in files]
@@ -945,14 +946,11 @@ def coadd( files, weights='exptime' ):
             thisfl = smooth( thiswl, thisfl, width=res, window='flat' )
         # ensure this spectrum is on the same wl array
         thisfl = np.interp(wl, thiswl, thisfl)
-        thiser = (np.interp(wl, thiswl, thiser))**2
-        if weights == 'exptime':
-            fl += thisfl*(float(h[0].header['exptime'])/totime)
-        elif weights == 'equal':
-            fl += thisfl/len(hdus)
-        else:
-            raise Exception('weights incorrectly defined!')
-        er += thiser # treat errors the same regardless of method
+        thiser = np.interp(wl, thiswl, thiser)
+        # sum the arrays in units of [flux*time]
+        fl += thisfl*float(h[0].header['exptime'])
+        er += thiser**0.5  # simply add the errors in quadrature; should be close enough!
+    fl = fl/totime # convert back to units of [flux]
     er = er**.5 / len(hdus)
     return wl, fl, er
 
