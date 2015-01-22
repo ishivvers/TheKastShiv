@@ -5,8 +5,10 @@ Utilities library for the Kast Shiv
 Author: Isaac Shivvers, ishivvers@berkeley.edu
 
 Steals heavily from Brad Cenko's kast_redux and iqutils packages,
-as well as the SilverClubb reduction pipeline.
-(Thanks Brad, Jeff, and Kelsey!)
+as well as the Matheson/Foley/Silverman/Clubb reduction pipeline.
+(Thanks John, Ryan, Jeff, and Kelsey!)
+More information on that pipeline, and the reasoning behind it,
+here: http://hercules.berkeley.edu/wiki/doku.php?id=kast_reduction_guide
 
 Best if run using the Ureka Python setup:
 http://ssb.stsci.edu/ureka/
@@ -359,7 +361,7 @@ def head_update( images, keywords, values, comment=None ):
             hdu[0].header.set(key, values[i], comment)
         hdu.writeto( image, clobber=True )
         hdu.close()
-    
+
 ############################################################################
 # bias, flatfielding, header updates
 ############################################################################
@@ -552,27 +554,29 @@ def parse_apfile( apfile ):
 
 ######################################################################
 
-def extract( image, side, arc=False, output=None, interact=True, reference=None, trace_only=False,
-             apfile=None, apfact=None, line_number=INDEF):
+def extract( image, side, arc=False, interact=True, reference=None, trace_only=False,
+             apfile=None, apfact=None, **kwargs):
     """
     Use apall to extract the spectrum.
     
     If arc=True, will not fit for or subtract a background, and you must include a reference.
-    If this is not the first spectrum from a set of consecutive observations
-     of the same object, pass along the extracted first observation as 'reference';
-     this will force interact=False and will use the parameters from the reference.
+    If this is part of a set of consecutive observations of the same object, and is not
+     the first, pass along the extracted first observation as 'reference';
+     this will force interact=False and will use all of the parameters from the reference.
     If 'reference' is given and trace_only is True, will only use the reference to define the
-     trace pattern, and not the aperature.  This is useful for extracting nebular spectra,
+     trace pattern, and not the aperture.  This is useful for extracting nebular spectra,
      when you can pass an image of the standard star along as a reference to define the trace.
      If 'reference' is not given, trace_only is ignored.
-    If output is not given, follows IRAF standard and sticks ".ms." in middle of filename.
-    If 'line_number' is given, will use that column of the image to define the aperture.
     If apfile is given, will use the aperture and background properties from that apfile,
      first multiplying by apfact if given (accounts for pixel size differences).
      Note: using either arc or reference keys will override the apfile.
+    Any additional keyword arguments will be passed along to iraf.apall directly, overriding any built-in defaults. 
+     Common keywords include:
+     - line_number: the column number to use to define the aperture (helpful for nebular spectra)
+     - nsum: the number of adjacent columns to sum (or median, if nsum<0) to define the aperture
+     - output: if not given, follows IRAF standard and sticks ".ms." in middle of filename (for "multispec").
+     See here for an exhaustive list: http://iraf.net/irafhelp.php?val=apextract.apall&help=Help+Page
     """
-    if output == None:
-        output = ''
     
     if interact:
         interactive = yes
@@ -587,60 +591,127 @@ def extract( image, side, arc=False, output=None, interact=True, reference=None,
         rdnoise = BLUERDNOISE
     else:
         raise StandardError( "side must be one of 'red','blue'" )
+
+    # taken mostly from Jeff Silverman's apall uparm file
+    ap_params = {'output':'',                  # basic parameters
+                 'apertures':'1',
+                 'format':'multispec',
+                 'references':'',
+                 'profiles':'',
+                 'interactive':interactive,    # processing / interactive parameters
+                 'find':yes,
+                 'recenter':no,
+                 'resize':no,
+                 'edit':yes,
+                 'trace':yes,
+                 'fittrace':yes,
+                 'extract':yes,
+                 'extras':yes,
+                 'review':yes,
+                 'line':INDEF,
+                 'nsum':100,
+                 'lower':-2.5,                 # default aperture parameters
+                 'upper':2.5,
+                 'apidtable':'',
+                 'b_function':'legendre',      # default background parameters
+                 'b_order':2,
+                 'b_sample':'-25:-10,10:25',
+                 'b_naver':-99,
+                 'b_niterate':3,
+                 'b_low_reject':3.0,
+                 'b_high_reject':2.0,
+                 'b_grow':1.0,
+                 'width':5.0,                 # aperture centering parameters
+                 'radius':10.0,
+                 'threshold':0.0,
+                 'nfind':1,                   # automatic finding and ordering parameters
+                 'minsep':5.0,
+                 'maxsep':1000.0,
+                 'order':'increasing',
+                 'aprecenter':'',             # recentering paramters
+                 'npeaks':INDEF,
+                 'shift':no,
+                 'llimit':INDEF,              # resizing parameters
+                 'ulimit':INDEF,
+                 'ylevel':0.01,
+                 'peak':yes,
+                 'bkg':yes,
+                 'r_grow':0.0,
+                 'avglimits':no,
+                 't_nsum':100,                 # tracing parameters
+                 't_step':20,
+                 't_nlost':3,
+                 't_function':'legendre',
+                 't_order':4,
+                 't_sample':'*',
+                 't_naverage':1,
+                 't_niterate':3,
+                 't_low_reject':3.0,
+                 't_high_reject':3.0,
+                 't_grow':0.0,
+                 'background':'fit',          # extraction parameters
+                 'skybox':1.0,
+                 'weights':'variance',
+                 'pfit':'fit1d',
+                 'clean':yes,
+                 'saturation':INDEF,
+                 'readnoise':rdnoise,
+                 'gain':gain,
+                 'lsigma':4.0,
+                 'usigma':4.0,
+                 'nsubaps':1
+                 }
+    if not interactive:
+        ap_params['recenter'] = yes
     
-    if interactive:
-        obj_name = pf.open(image)[0].header['object']
-        print 'Processing image %s \n Object: %s\n' %(image, obj_name)
+    obj_name = pf.open(image)[0].header['object']
+    print 'Processing image %s \n Object: %s\n' %(image, obj_name)
 
     if (reference == None) & (arc == False) & (apfile == None):
         print 'Extracting object; no reference.'
-        iraf.apall(image, output=output, references='', interactive=interactive,
-                   find=yes, recenter=yes, resize=yes, edit=yes, trace=yes,
-                   fittrace=yes, extract=yes, extras=yes, review=yes,
-                   background='fit', weights='variance', pfit='fit1d',
-                   readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
-                   ulimit=20, ylevel=0.01, b_sample="-35:-25,25:35", b_order=2,
-                   t_function="legendre", t_order=4, line=line_number, t_nlost=50 )
+
     elif (reference != None) & (arc == False):
-        if not trace_only:
-            print 'Extracting object using reference.'
-            iraf.apall(image, output=output, references=reference, interactive=interactive,
-                       find=no, recenter=no, resize=no, edit=no, trace=yes,
-                       fittrace=no, extract=yes, extras=yes, review=yes,
-                       background='fit', weights='variance', pfit='fit1d',
-                       readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
-                       ulimit=20, ylevel=0.01, b_order=2,
-                       t_function="legendre", t_order=4, line=line_number, t_nlost=50 )
-        else:
+        if trace_only:
             print 'Extracting object using reference for trace only.'
-            iraf.apall(image, output=output, references=reference, interactive=interactive,
-                       find=yes, recenter=yes, resize=yes, edit=yes, trace=yes,
-                       fittrace=no, extract=yes, extras=yes, review=yes,
-                       background='fit', weights='variance', pfit='fit1d',
-                       readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
-                       ulimit=20, ylevel=0.01, b_order=2,
-                       t_function="legendre", t_order=4, line=line_number )
+            ap_params['references'] = reference
+            ap_params['edit']       = yes
+            ap_params['trace']      = no
+            ap_params['fittrace']   = no
+        else:
+            print 'Extracting object using reference.'
+            ap_params['references'] = reference
+            ap_params['recenter']   = no
+            ap_params['edit']       = no
+            ap_params['fittrace']   = no
+
     elif arc:
         print 'Extracting arc.'
-        iraf.apall(image, output=output, references=reference, interactive=no,
-                   find=no, recenter=no, resize=no, edit=no, trace=no, fittrace=no,
-                   extract=yes, extras=yes, review=no, background='none',
-                   readnoise=rdnoise, gain=gain)
+        ap_params['interactive'] = no  #override input 
+        ap_params['references']  = reference
+        ap_params['recenter']    = no
+        ap_params['edit']        = no
+        ap_params['trace']       = no
+        ap_params['fittrace']    = no
+
     elif (apfile != None):
         ap, lbg, rbg = parse_apfile( apfile )
         if apfact == None:
             apfact = 1.0
-        print 'Extracting object using reference apfile.'
-        iraf.apall(image, output=output, references='', interactive=interactive,
-                   find=yes, recenter=no, resize=no, edit=yes, trace=yes,
-                   fittrace=yes, extract=yes, extras=yes, review=yes,
-                   background='fit',  b_order=2, weights='variance', pfit='fit1d',
-                   readnoise=rdnoise, gain=gain, nfind=1, apertures='1',
-                   ulimit=20, ylevel=0.01, t_function="legendre", t_order=4,
-                   lower=ap[0]*apfact, upper=ap[1]*apfact, line=line_number, t_nlost=50,
-                   b_sample="%.2f:%.2f,%.2f:%.2f" %(lbg[0]*apfact, lbg[1]*apfact, rbg[0]*apfact, rbg[1]*apfact) )
+        print 'Extracting object using reference apfile and apfact=%.2f.'%apfact
+        ap_params['references'] = ''
+        ap_params['find']       = no
+        ap_params['recenter']   = no
+        ap_params['lower']      = ap[0]*apfact
+        ap_params['upper']      = ap[1]*apfact
+        ap_params['b_sample']   = "%.2f:%.2f,%.2f:%.2f" %(lbg[0]*apfact, lbg[1]*apfact, rbg[0]*apfact, rbg[1]*apfact)
+
     else:
         raise StandardError( "unacceptable keyword combination" )
+
+    # override any defaults with input kwargs
+    ap_params.update( kwargs )
+    # now actually perform the extraction
+    iraf.apall(image, **ap_params )
 
 ############################################################################
 # cosmic ray removal
