@@ -9,13 +9,16 @@ This script goes into all of the files that require
  properly.
 """
 
-import os
+import os, platform
 homedir = os.path.realpath('.')
 
 # update the shivutils file
 s = open('shivutils.template.py','r').read()
-inn = raw_input('What is the path to the IDL executable?\n')
-s = s.replace('replace_me:IDLPATH', inn)
+if platform.node() != 'classy':
+    idlpath = raw_input('What is the path to the IDL executable?\n')
+else:
+    idlpath = '/home/isaac/Working/code/IDL/idl83/bin/idl'
+s = s.replace('replace_me:IDLPATH', idlpath)
 s = s.replace('replace_me:HOMEDIR', homedir)
 open('shivutils.py','w').write(s)
 
