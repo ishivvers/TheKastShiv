@@ -63,7 +63,8 @@ class Shiv(object):
                       self.id_arcs,
                       self.apply_wavelength,
                       self.flux_calibrate,
-                      self.coadd_join_output]
+                      self.coadd_join_output,
+                      self.plt_flams]
         self.current_step = 0
 
         self.extracted_images = [[],[]]  #[red,blue]; used to keep track of multiple observations of the same object
@@ -652,13 +653,16 @@ class Shiv(object):
                 su.run_cmd(' mv %s ../final/.' %f )
         os.chdir( '../final' )
 
-    def coadd_join_output(self):
+    def coadd_join_output(self, globstr=''):
         """
         Coadds any multiple observations of the same science object,
          joins the red and blue sides of each observation, and then Saves
          the result as an ASCII (.flm) file.
+        If globstr is given, only processes files that start with that glob string (example: glob='sn2014ds')
         """
-        allfiles = glob('*[(uv)(ir)].ms.fits')
+        if globstr != '':
+            globstr = '*'+globstr
+        allfiles = glob(globstr+'*[(uv)(ir)].ms.fits')
         # try:
         while True:
             if self.interactive:
@@ -702,7 +706,9 @@ class Shiv(object):
                 red = list(su.read_calfits( fred ))
                 allfiles.remove(f)
                 allfiles.remove(fred)
-
+            inn = raw_input('\nJoin %s and %s? (y/n)\n' %(red,blue) )
+            if 'n' in inn.lower():
+                break
             wl,fl,er = su.join( blue, red, interactive=self.interactive )
             self.log.info('Joined '+f+' to '+fred)
             fname = f.replace('uv','uvir').replace('.ms.fits','.flm')
