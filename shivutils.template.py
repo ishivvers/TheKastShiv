@@ -57,6 +57,7 @@ BLUEBIAS2='[2082:2110,*]'
 BLUEGAIN1=1.2
 BLUEGAIN2=1.237
 BLUERDNOISE=3.7
+KASTAPFACT=1.8558
 
 # give the path to the IDL executable and home folders
 ## THIS PART FILLED IN BY SETUP.PY ##
@@ -669,6 +670,11 @@ def extract( image, side, arc=False, interact=True, reference=None, trace_only=F
 
     if (reference == None) & (arc == False) & (apfile == None):
         print 'Extracting object; no reference.'
+        if side=='blue':
+            # resize the default aperature for the blue side
+            ap_params['lower'] = -4.6
+            ap_params['upper'] = 4.6
+            ap_params['b_sample'] = '-46:-18,18:46'
 
     elif (reference != None) & (arc == False):
         if trace_only:
@@ -696,10 +702,10 @@ def extract( image, side, arc=False, interact=True, reference=None, trace_only=F
     elif (apfile != None):
         ap, lbg, rbg = parse_apfile( apfile )
         if apfact == None:
-            apfact = 1.0
+            apfact = KASTAPFACT
         print 'Extracting object using reference apfile and apfact=%.2f.'%apfact
         ap_params['references'] = ''
-        ap_params['find']       = no
+        ap_params['find']       = yes
         ap_params['recenter']   = no
         ap_params['lower']      = ap[0]*apfact
         ap_params['upper']      = ap[1]*apfact
