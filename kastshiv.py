@@ -706,7 +706,7 @@ class Shiv(object):
                 red = list(su.read_calfits( fred ))
                 allfiles.remove(f)
                 allfiles.remove(fred)
-            inn = raw_input('\nJoin %s and %s? (y/n)\n' %(red,blue) )
+            inn = raw_input('\nJoin %s and %s? (y/n)\n' %(fred,f) )
             if 'n' in inn.lower():
                 break
             wl,fl,er = su.join( blue, red, interactive=self.interactive )
