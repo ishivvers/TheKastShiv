@@ -917,7 +917,8 @@ def coadd( files ):
     """
     Reads in a list of fits file namess (file formats as expected from flux-calibrated
      spectra, after using the IDL routine cal.pro).
-    Simply takes the average amongst all spectra given.  If the wavelength 
+    Converts all input specta into units of [flux * time], adds them, and then divides
+     by the total time to return a spectrum in units of [flux].  If the wavelength 
      arrays are different will interpolate all spectra onto the region covered
      by all input spectra, rebinning all data to the same resolution first if needed
      (using the resolution of the lowest-resolution spectrum).
@@ -942,14 +943,14 @@ def coadd( files ):
             # need to rebin data to this resolution.
             # will be a downsampling, so we first have to smooth the data
             #  to this resolution using a square window.
-            # Note: I do not in any way downsample or smooth the noise estimates.
+            # Note: I do not smooth the noise estimates; I just downsample them.
             thisfl = smooth( thiswl, thisfl, width=res, window='flat' )
         # ensure this spectrum is on the same wl array
         thisfl = np.interp(wl, thiswl, thisfl)
         thiser = np.interp(wl, thiswl, thiser)
         # sum the arrays in units of [flux*time]
         fl += thisfl*float(h[0].header['exptime'])
-        er += thiser**0.5  # simply add the errors in quadrature; should be close enough!
+        er += thiser**2.0  # simply add the errors in quadrature; should be close enough!
     fl = fl/totime # convert back to units of [flux]
     er = er**.5 / len(hdus)
     return wl, fl, er
