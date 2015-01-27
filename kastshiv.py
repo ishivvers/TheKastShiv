@@ -2,19 +2,6 @@
 The Kast Shiv: a Kast spectrocscopic reduction pipeline
  written by I.Shivvers (modified from the K.Clubb/J.Silverman/T.Matheson
  pipeline and the B.Cenko pipeline - thanks everyone).
-
-NOTE:
-some weirdnesses when associating blue files with red ones.  looks like it tries
- to match to the very first red file first, and then (maybe) uses the correct
- apfile?
-
-TO DO:
- - still some weirdnesses in the coadd-join script;
-  - if there is no co-add option, you don't get to skip
-    a file
-  - sometimes files are displayed twice
-  - what if you want to co-add all but one file, or something?
-  - need to be able to call 'coadd all these' and then, seperately, 'join these'
 """
 
 import shivutils as su
