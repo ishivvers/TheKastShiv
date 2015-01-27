@@ -764,10 +764,10 @@ class Shiv(object):
             if 'n' in inn.lower():
                 continue
             su.np2flm( fname, wl,fl,er )
-            self.log.info( namedate+' saved to file '+output_name)
+            self.log.info( namedate+' saved to file '+output_name )
             
             # only drop from the list if we got all the way through and successfully saved it
-            allfiles = [f if re.search(namedate+'.*', f) for f in allfiles]
+            allfiles = [f for f in allfiles if re.search(namedate+'.*', f)]
 
 
     def coadd(self, files=None, globstr=None):
@@ -803,8 +803,8 @@ class Shiv(object):
                 allfiles = glob('*'+globstr+'*.flm')
             else:
                 raise Exception('ftype must be one of "fits", "flm"')
-            red = [f if re.search('ir', f) for f in allfiles][0]
-            blue = [f if re.search('uv', f) for f in allfiles][0]
+            red = [f for f in allfiles if re.search('ir', f) ][0]
+            blue = [f for f in allfiles if re.search('uv', f) ][0]
         else:
             blue, red = files
         inn = raw_input('\n Join the following files? \n  UV: %s\n  IR: %s\n [y/n] (y):\n')
