@@ -7,6 +7,14 @@ NOTE:
 some weirdnesses when associating blue files with red ones.  looks like it tries
  to match to the very first red file first, and then (maybe) uses the correct
  apfile?
+
+TO DO:
+ - still some weirdnesses in the coadd-join script;
+  - if there is no co-add option, you don't get to skip
+    a file
+  - sometimes files are displayed twice
+  - what if you want to co-add all but one file, or something?
+  - need to be able to call 'coadd all these' and then, seperately, 'join these'
 """
 
 import shivutils as su
@@ -431,8 +439,8 @@ class Shiv(object):
                         print
                         print fname,':::',o[-1]
                         print reference[0],':::',reference[1]
-                        inn = raw_input( 'Use %s as a reference for %s? (y/n)\n' %(reference[0], fname) )
-                        if 'y' in inn.lower():
+                        inn = raw_input( '\nUse %s as a reference for %s?: (y)\n' %(reference[0], fname) )
+                        if 'n' not in inn.lower():
                             break
                         reference = None
                 
@@ -536,6 +544,8 @@ class Shiv(object):
         su.extract( fname, side, interact=self.interactive, **kwargs )
         if (side == 'red') and (fname not in [extracted[0] for extracted in self.extracted_images[0]]):
             self.extracted_images[0].append( [fname,o[4]] )
+        if (side == 'blue') and (fname not in [extracted[0] for extracted in self.extracted_images[1]]):
+            self.extracted_images[1].append( [fname,o[4]] )
 
     def extract_arc_spectra(self):
         """
@@ -656,77 +666,169 @@ class Shiv(object):
     def coadd_join_output(self, globstr=''):
         """
         Coadds any multiple observations of the same science object,
-         joins the red and blue sides of each observation, and then Saves
+         joins the red and blue sides of each observation, and then saves
          the result as an ASCII (.flm) file.
-        If globstr is given, only processes files that start with that glob string (example: glob='sn2014ds')
+        If globstr is given, only processes files that include that glob string (example: glob='sn2014ds').
+        This task must be run interactively.
         """
         if globstr != '':
             globstr = '*'+globstr
         allfiles = glob(globstr+'*[(uv)(ir)].ms.fits')
-        # try:
+        
         while True:
-            if self.interactive:
-                print 'Files remaining to process:'
-                for f in allfiles: print ' ',f
-                inn = raw_input('\nHit enter to continue, or q to quit\n')
-                if 'q' in inn.lower():
-                    break
-            f = [f for f in allfiles if 'uv' in f][0]
-            fred = f.replace('uv','ir')
-            namedate = re.search('.*\d{8}', f).group()
-            bluematches = glob( namedate + '*' + 'uv.ms.fits' )
-            redmatches = glob( namedate + '*' + 'ir.ms.fits' )
-            doit = True
-            if len(bluematches) == len(redmatches) == 1:
-                doit = False
-            if self.interactive and doit:
-                print 'Combine the following files: \n'+str(bluematches)+'\n'+str(redmatches)+'?\n'
-                inn = raw_input( 'y for yes, c for continue to the next file, anything else for no\n' )
-                if 'c' in inn.lower():
-                    allfiles.remove(f)
-                    continue
-                elif 'y' not in inn.lower():
-                    doit = False
-            if doit:
-                blue = list(su.coadd( bluematches ))
-                red = list(su.coadd( redmatches ))
-                for fff in bluematches+redmatches:
-                    allfiles.remove(fff)
-                # need to update the filename to show that it was averaged
-                # assumes that all were observed on the same day
-                f_timestr = re.search( '\.\d{3}', f ).group()
-                avg_time = np.mean( [float(re.search('\.\d{3}', fff).group()) for fff in bluematches] )
-                new_timestr = ('%.3f'%avg_time)[1:] #drop the leading 0
-                f = f.replace( f_timestr, new_timestr )
-                
-                self.log.info( 'Coadded the following files: '+str(bluematches))
-                self.log.info( 'Coadded the following files: '+str(redmatches))
-            else:
-                blue = list(su.read_calfits( f ))
-                red = list(su.read_calfits( fred ))
-                allfiles.remove(f)
-                allfiles.remove(fred)
-            inn = raw_input('\nJoin %s and %s? (y/n)\n' %(fred,f) )
-            if 'n' in inn.lower():
+            ## choose the file to do
+            print 'Files remaining to process:'
+            for i,f in enumerate(allfiles): print i,':::',f
+            inn = raw_input('\n Choose the number of a spectrum to coadd/join, or q to quit\n')
+            if 'q' in inn.lower():
                 break
-            wl,fl,er = su.join( blue, red, interactive=self.interactive )
-            self.log.info('Joined '+f+' to '+fred)
-            fname = f.replace('uv','uvir').replace('.ms.fits','.flm')
-            doit = True
-            if self.interactive:
-                su.plot_spectra( wl,fl,er, title=namedate )
-                inn = raw_input('Save ' + namedate + ' to file?\n')
-                if 'y' not in inn.lower():
-                    doit = False
-            if doit:
-                su.np2flm( fname, wl,fl,er )
-                self.log.info( namedate+' saved to file '+fname)
-        # except:
-            # pass
-        if len(allfiles) > 0:
-            print "Following files were not processed:"
-            for f in allfiles: print ' ',f
+            else:
+                try:
+                    which = int(inn)
+                except ValueError:
+                    print '\nWhat?\n'
+                    continue
+            f = allfiles[which]
+            if 'uv' in f:
+                fblue = f
+                fred = f.replace('uv','ir')
+            elif 'ir' in f:
+                fred = f
+                fblue = f.replace('ir','uv')
+            else:
+                raise Exception('Unknown naming scheme.')
+            namedate = re.search('.*\d{8}', f).group()
+            
+            # find all the blues, and coadd them
+            bluematches = glob( namedate + '*' + 'uv.ms.fits' )
+            if len(bluematches) > 1:
+                inn = raw_input( 'Combine the following files: \n'+str(bluematches)+'? [y/n] (y):\n' )
+                if 'n' not in inn:
+                    blue = list(su.coadd( bluematches ))
+                    self.log.info( 'Coadded the following files: '+str(bluematches))
+                    # need to update the filename to show that it was averaged
+                    # assumes that all were observed on the same day
+                    f_timestr = re.search( '\.\d{3}', fblue ).group()
+                    avg_time = np.mean( [float(re.search('\.\d{3}', fff).group()) for fff in bluematches] )
+                    new_timestr = ('%.3f'%avg_time)[1:] #drop the leading 0
+                    fblue = fblue.replace( f_timestr, new_timestr )
+                else:
+                    print 'Choose which file you want:'
+                    for i,f in enumerate(bluematches): print i,':::',f
+                    inn = raw_input('Enter a number, or q to quit\n')
+                    if 'q' in inn:
+                        continue
+                    else:
+                        try:
+                            fblue = bluematches[int(inn)]
+                            blue = list(su.read_calfits( fblue ))
+                        except ValueError:
+                            print '\nWhat?\n'
+                            continue
+            elif len(bluematches) == 1:
+                fblue = bluematches[0]
+                blue = list(su.read_calfits( fblue ))
+            else:
+                raise Exception('Found no blue file!')
+            
+            # find all the reds, and coadd them
+            redmatches = glob( namedate + '*' + 'ir.ms.fits' )
+            if len(redmatches) > 1:
+                inn = raw_input( 'Combine the following files: \n'+str(redmatches)+'? [y/n] (y):\n' )
+                if 'n' not in inn:
+                    red = list(su.coadd( redmatches ))
+                    self.log.info( 'Coadded the following files: '+str(redmatches))
+                    # need to update the filename to show that it was averaged
+                    # assumes that all were observed on the same day
+                    f_timestr = re.search( '\.\d{3}', fred ).group()
+                    avg_time = np.mean( [float(re.search('\.\d{3}', fff).group()) for fff in redmatches] )
+                    new_timestr = ('%.3f'%avg_time)[1:] #drop the leading 0
+                    fred = fred.replace( f_timestr, new_timestr )
+                else:
+                    print 'Choose which file you want:'
+                    for i,f in enumerate(redmatches): print i,':::',f
+                    inn = raw_input('Enter a number, or q to quit\n')
+                    if 'q' in inn:
+                        continue
+                    else:
+                        try:
+                            fred = redmatches[int(inn)]
+                            red = list(su.read_calfits( fred ))
+                        except ValueError:
+                            print '\nWhat?\n'
+                            continue
+            elif len(redmatches) == 1:
+                fred = redmatches[0] 
+                red = list(su.read_calfits( fred ))
+            else:
+                raise Exception('Found no red file!')
 
+            # join the blue and red sides
+            inn = raw_input('\nJoin %s and %s? [y/n] (y)\n' %(fblue, fred) )
+            if 'n' in inn.lower():
+                continue
+            wl,fl,er = su.join( blue, red, interactive=self.interactive )
+            self.log.info('Joined '+fblue+' to '+fred)
+            output_name = fred.replace('uv','uvir').replace('.ms.fits','.flm')
+            
+            # should we save the result?
+            su.plot_spectra( wl,fl,er, title=namedate )
+            inn = raw_input('Save ' + namedate + ' to file: %s? [y/n] (y)\n'%output_name)
+            if 'n' in inn.lower():
+                continue
+            su.np2flm( fname, wl,fl,er )
+            self.log.info( namedate+' saved to file '+output_name)
+            
+            # only drop from the list if we got all the way through and successfully saved it
+            allfiles = [f for f in allfiles if re.search(namedate+'.*', f)]
+
+
+    def coadd(self, files=None, globstr=None):
+        """
+        Coadd a set of files.  If given globstr, will coadd all files
+         that match it.  If given files (a list), will coadd those files.
+         Only accepts fits files as an argument.
+        """
+        if 'globstr' != None:
+            files = glob('*'+globstr+'*')
+        
+        inn = raw_input('\n Co-add the following files? \n'+str(files)+\
+                         '\n [y/n] (y):\n')
+        if 'n' not in inn.lower():
+            f_timestr = re.search( '\.\d{3}', files[0] ).group()
+            avg_time = np.mean( [float(re.search('\.\d{3}', fff).group()) for fff in files] )
+            new_timestr = ('%.3f'%avg_time)[1:] #drop the leading 0
+            fname = files[0].replace( f_timestr, new_timestr )
+            wl,fl,er = su.coadd( bluematches )
+            su.np2flm( fname, wl,fl,er )
+            self.log.info( 'Co-addition of %s saved to file %s'%(str(files), fname) )
+
+    def join(self, files=None, globstr=None, ftype='fits'):
+        """
+        Join red+blue sides of a set of .flm files.  If given globstr, looks for red (ir) and
+         blue (uv) versions with that globstring.  If given files (a list of [blue, red]),
+         will simply join those. ftype can be one of ["fits" or "flm"].
+        """
+        if 'globstr' != None:
+            if ftype == 'fits':
+                allfiles = glob('*'+globstr+'*.fits')
+            elif ftype == 'flm':
+                allfiles = glob('*'+globstr+'*.flm')
+            else:
+                raise Exception('ftype must be one of "fits", "flm"')
+            red = [f if re.search('ir', f) for f in allfiles][0]
+            blue = [f if re.search('uv', f) for f in allfiles][0]
+        else:
+            blue, red = files
+        inn = raw_input('\n Join the following files? \n  UV: %s\n  IR: %s\n [y/n] (y):\n')
+        if 'n' not in inn:
+            if ftype == 'fits':
+                red = list(su.read_calfits( red ))
+                blue = list(su.read_calfits( blue ))
+            else:
+                red = np.loadtxt(red, unpack=True)
+                blue = np.loadtxt(blue, unpack=True)
+            wl,fl,er = su.join( blue, red, interactive=self.interactive )
 
     def plt_flams(self):
         """
