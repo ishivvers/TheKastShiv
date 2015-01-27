@@ -767,7 +767,7 @@ class Shiv(object):
             self.log.info( namedate+' saved to file '+output_name)
             
             # only drop from the list if we got all the way through and successfully saved it
-            allfiles = [f for f in allfiles if re.search(namedate+'.*', f)]
+            allfiles = [f if re.search(namedate+'.*', f) for f in allfiles]
 
 
     def coadd(self, files=None, globstr=None):
