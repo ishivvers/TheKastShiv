@@ -170,6 +170,9 @@ class Shiv(object):
         except IndexError:
             print 'End of reduction pipeline.'
 
+    def status(self):
+        self.summary()
+
     def run(self, skips=[]):
         while True:
             if self.current_step in skips:
