@@ -31,6 +31,9 @@ class Shiv(object):
         self.dateUT = dateUT
         self.inlog = inlog
         self.pagename = pagename
+        # have the iraf yes/no variables accessible
+        self.yes = su.yes
+        self.no = su.no
         if savefile == None:
             self.savefile = os.path.abspath('.') + '/' + self.runID + '.sav'
         else:
@@ -424,12 +427,16 @@ class Shiv(object):
 
                 # if we're interactive, give the user some choice here
                 if self.interactive:
+                    print '\nCurrent image:',fname
+                    inn = raw_input('\nView image with ds9? [y/n](n):\n')
+                    if 'y' in inn.lower():
+                        os.system('ds9 -scale log -geometry 1200x600 %s &' %fname)
                     for iref in irefs:
                         reference = self.extracted_images[0][iref]
                         print
                         print fname,':::',o[-1]
                         print reference[0],':::',reference[1]
-                        inn = raw_input( '\nUse %s as a reference for %s?: (y)\n' %(reference[0], fname) )
+                        inn = raw_input( '\nUse %s as a reference for %s?: [y/n](y)\n' %(reference[0], fname) )
                         if 'n' not in inn.lower():
                             break
                         reference = None
@@ -467,6 +474,10 @@ class Shiv(object):
                 
                 # if we're interactive, give the user some choice here
                 if self.interactive:
+                    print '\nCurrent image:',fname
+                    inn = raw_input('\nView image with ds9? [y/n](n):\n')
+                    if 'y' in inn.lower():
+                        os.system('ds9 -scale log -geometry 1200x600 -zoom 0.6 %s &' %fname)
                     blueref = False
                     # choose from blue references first
                     for iref in blue_irefs:
@@ -474,8 +485,8 @@ class Shiv(object):
                         print
                         print fname,':::',o[-1]
                         print reference[0],':::',reference[1]
-                        inn = raw_input( 'Use %s as a reference for %s? (y/n)\n' %(reference[0], fname) )
-                        if 'y' in inn.lower():
+                        inn = raw_input( 'Use %s as a reference for %s? [y/n](y)\n' %(reference[0], fname) )
+                        if 'n' not in inn.lower():
                             blueref = True
                             break
                         reference = None
@@ -486,8 +497,8 @@ class Shiv(object):
                             print
                             print fname,':::',o[-1]
                             print reference[0],' :::',reference[1]
-                            inn = raw_input( 'Use %s as a reference for %s? (y/n)\n' %(reference[0], fname) )
-                            if 'y' in inn.lower():
+                            inn = raw_input( 'Use %s as a reference for %s? [y/n](y)\n' %(reference[0], fname) )
+                            if 'n' not in inn.lower():
                                 break
                             reference = None
 
@@ -520,7 +531,7 @@ class Shiv(object):
 
         A few quick examples:
         >> extract using a trace from another image:
-         > S.extract_object_special( <side>, <iobject>, reference=<reference_image>, edit=yes, trace=no, fittrace=no )
+         > S.extract_object_special( <side>, <iobject>, reference=<reference_image>, edit=S.yes, trace=S.no, fittrace=S.no )
         """
         if side == 'red':
             o = self.robjects[iobject]
@@ -536,6 +547,12 @@ class Shiv(object):
             self.extracted_images[0].append( [fname,o[4]] )
         if (side == 'blue') and (fname not in [extracted[0] for extracted in self.extracted_images[1]]):
             self.extracted_images[1].append( [fname,o[4]] )
+
+    def splot(self, filename ):
+        """
+        Use iraf's splot to view a 1d fits file spectrum
+        """
+        su.splot( filename )
 
     def extract_arc_spectra(self):
         """
@@ -759,18 +776,18 @@ class Shiv(object):
                 continue
             wl,fl,er = su.join( blue, red, interactive=self.interactive )
             self.log.info('Joined '+fblue+' to '+fred)
-            output_name = fred.replace('uv','uvir').replace('.ms.fits','.flm')
+            output_name = fred.replace('ir','uvir').replace('.ms.fits','.flm')
             
             # should we save the result?
             su.plot_spectra( wl,fl,er, title=namedate )
             inn = raw_input('Save ' + namedate + ' to file: %s? [y/n] (y)\n'%output_name)
             if 'n' in inn.lower():
                 continue
-            su.np2flm( fname, wl,fl,er )
+            su.np2flm( output_name, wl,fl,er )
             self.log.info( namedate+' saved to file '+output_name )
             
             # only drop from the list if we got all the way through and successfully saved it
-            allfiles = [f for f in allfiles if re.search(namedate+'.*', f)]
+            allfiles = [f for f in allfiles if not re.search(namedate+'.*', f)]
 
 
     def coadd(self, files=None, globstr=None):

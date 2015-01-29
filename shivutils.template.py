@@ -69,7 +69,7 @@ if ('replace_me' in IDLPATH) or ('replace_me' in HOMEDIR):
 # location of various helpful files
 COORDLIST=HOMEDIR+'/tools/licklinelist.dat'
 LOGINCL=HOMEDIR+'/tools/custom_cl/login.cl'
-REDARCIMG=HOMEDIR+'/tools/kast_arc_red.jpeg'
+REDARCIMG=HOMEDIR+'/tools/kast_arc_blue+red.pdf'
 BLUEARCIMG=HOMEDIR+'/tools/kast_arc_blue.jpeg'
 
 # copy over login.cl file before starting iraf
