@@ -247,17 +247,21 @@ class Shiv(object):
         su.make_file_system( self.runID )
         os.chdir( self.runID )
 
-    def get_data(self, datePT=None):
+    def get_data(self, datePT=None, creds=None):
         """
         Download data and populate relevant folders.  Requires local (Pacific) time string
-         as an argument (e.g.: '2014/12/24')
+         as an argument (e.g.: '2014/12/24').  You can optionally include login
+         credentials for the data server in the form of (un, pw).
         Should be run from root folder, and leaves you in working folder.
         """
         if datePT == None:
             datePT = self.datePT
         self.log.info('Downloading data for %s'%datePT)
         os.chdir( 'rawdata' )
-        su.get_kast_data( datePT )
+        if creds == None:
+            su.get_kast_data( datePT )
+        else:
+            su.get_kast_data( datePT, un=creds[0], pw=creds[1] )
         os.chdir( '../working' )
 
     def move_data(self, dateUT=None, logfile=None, pagename=None):
