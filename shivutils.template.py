@@ -8,7 +8,7 @@ Steals heavily from Brad Cenko's kast_redux and iqutils packages,
 as well as the Matheson/Foley/Silverman/Clubb reduction pipeline.
 (Thanks John, Ryan, Jeff, and Kelsey!)
 More information on that pipeline, and the reasoning behind it,
-here: http://hercules.berkeley.edu/wiki/doku.php?id=kast_reduction_guide
+here: http://heracles.astro.berkeley.edu/wiki/doku.php?id=kast_reduction_guide
 
 Best if run using the Ureka Python setup:
 http://ssb.stsci.edu/ureka/
@@ -245,7 +245,7 @@ def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None, infile=
         creds = urllib.urlencode({"u" : un, "p" : pw})
         
         # open the Night Summary page for the run
-        soup = BeautifulSoup( urllib.urlopen("http://hercules.berkeley.edu/wiki/doku.php?id="+pagename,creds) )
+        soup = BeautifulSoup( urllib.urlopen("http://heracles.astro.berkeley.edu/doku.php?id="+pagename,creds) )
         
         # make sure the table is there
         if soup.body.table == None:
@@ -523,7 +523,7 @@ def reid_arc(arc, reference, interact=True, coordlist=COORDLIST):
         interactive = yes
     else:
         interactive = no
-    iraf.reidentify(reference, arc, coordlist=coordlist, interactive=interactive)
+    iraf.reidentify(reference, arc, coordlist=coordlist, interactive=interactive, override=yes)
 
 ############################################################################
 

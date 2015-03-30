@@ -611,8 +611,8 @@ class Shiv(object):
         allgroups.remove( self.robjects[0][2] )    # and the first object's arcs
         for i in allgroups:
             objarc = [self.apf+self.erroot%o[0] for o in self.rarcs if o[2]==i][0]
-            su.reid_arc( objarc, firstobjarc, interact=False )
-            self.log.info("ID'd "+objarc+" using "+firstobjarc+" as a reference")
+            su.reid_arc( objarc, 'Combined_0.5_Arc.ms.fits', interact=True )
+            self.log.info("ID'd "+objarc+" using Combined_0.5_Arc.ms.fits as a reference")
 
     def apply_wavelength(self):
         """
