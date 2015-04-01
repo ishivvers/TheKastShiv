@@ -69,8 +69,8 @@ if ('replace_me' in IDLPATH) or ('replace_me' in HOMEDIR):
 # location of various helpful files
 COORDLIST=HOMEDIR+'/tools/licklinelist.dat'
 LOGINCL=HOMEDIR+'/tools/custom_cl/login.cl'
-REDARCIMG=HOMEDIR+'/tools/kast_arc_blue+red.pdf'
-BLUEARCIMG=HOMEDIR+'/tools/kast_arc_blue.jpeg'
+REDARCIMG=HOMEDIR+'/tools/KastRed_300-7500_ArHeHgCdNe.png'
+BLUEARCIMG=HOMEDIR+'/tools/KastBlue_600-4310_ArHeHgCd.png'
 
 # copy over login.cl file before starting iraf
 cwd = os.path.realpath('.')
