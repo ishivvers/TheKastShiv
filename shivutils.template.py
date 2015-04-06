@@ -913,7 +913,7 @@ def read_calfits( f ):
 
 ######################################################################
 
-def coadd( files ):
+def coadd( files, save=True, fname=None ):
     """
     Reads in a list of fits file namess (file formats as expected from flux-calibrated
      spectra, after using the IDL routine cal.pro).
@@ -929,6 +929,11 @@ def coadd( files ):
     wlmin = max( [h[0].header['crval1'] for h in hdus] )
     wlmax = min( [h[0].header['crval1'] + h[0].data.shape[-1]*h[0].header['cdelt1'] for h in hdus] )
     totime = sum([float(h[0].header['exptime']) for h in hdus])
+    # get obsdate info
+    date_fmt = '%Y-%m-%dT%H:%M:%S.%f'
+    obs_begin = min([ datetime.strptime( h[0].header['date-beg'], date_fmt ) for h in hdus ])
+    obs_end = max([ datetime.strptime( h[0].header['date-end'], date_fmt ) for h in hdus ])
+    obs_mid = obs_begin + (obs_end-obs_begin)/2
     # define the output wavelength range; go just over wlmax to make sure it's included
     wl = np.arange( wlmin, wlmax+res/10.0, res )
     fl = np.zeros_like(wl)
@@ -953,6 +958,25 @@ def coadd( files ):
         er += thiser**2.0  # simply add the errors in quadrature; should be close enough!
     fl = fl/totime # convert back to units of [flux]
     er = er**.5 / len(hdus)
+    if save:
+        # save the co-added fits file
+        if fname == None:
+            fname = 'coadded.'+files[0]
+        hdu = hdus[0]
+        # update header
+        head = hdu[0].header
+        head['exptime'] = totime
+        head['date-beg'] = datetime.strftime( obs_begin, date_fmt )
+        head['date-obs'] = datetime.strftime( obs_begin, date_fmt )
+        head['utmiddle'] = datetime.strftime( obs_mid, date_fmt )
+        head['date-end'] = datetime.strftime( obs_end, date_fmt )
+        head['crval1'] = wlmin
+        head['cdelt1'] = res
+        head.append( ('cadd-frm', ','.join(files), 'coadded from these files'), end=True )
+        # update data
+        hdu.data = np.vstack( (fl, er) )
+        # save the file
+        hdu.writeto( fname )
     return wl, fl, er
 
 ######################################################################

@@ -715,14 +715,14 @@ class Shiv(object):
             if len(bluematches) > 1:
                 inn = raw_input( 'Combine the following files: \n'+str(bluematches)+'? [y/n] (y):\n' )
                 if 'n' not in inn:
-                    blue = list(su.coadd( bluematches ))
-                    self.log.info( 'Coadded the following files: '+str(bluematches))
                     # need to update the filename to show that it was averaged
                     # assumes that all were observed on the same day
                     f_timestr = re.search( '\.\d{3}', fblue ).group()
                     avg_time = np.mean( [float(re.search('\.\d{3}', fff).group()) for fff in bluematches] )
                     new_timestr = ('%.3f'%avg_time)[1:] #drop the leading 0
                     fblue = fblue.replace( f_timestr, new_timestr )
+                    blue = list(su.coadd( bluematches, fname=fblue ))
+                    self.log.info( 'Coadded the following files: '+str(bluematches))
                 else:
                     print 'Choose which file you want:'
                     for i,f in enumerate(bluematches): print i,':::',f
