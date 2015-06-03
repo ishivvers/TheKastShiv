@@ -102,20 +102,25 @@ class Shiv(object):
             self.summary()
         # handle the prefixes properly
         if self.current_step <= 5:
-            self.opf = self.apf = self.fpf = ''
+            self.opf = ''
+            self.apf = ''
+            self.fpf = ''
         elif 5 < self.current_step <= 9:
-            self.opf = self.apf = self.fpf = 'b'
+            self.opf = 'b'
+            self.apf = 'b'
+            self.fpf = 'b'
         elif 8 < self.current_step <= 9 :
+            self.opf = 'fb'
+            self.apf = 'fb'
             self.fpf = 'b'
-            self.opf = self.apf = 'fb'
         elif 9 < self.current_step <= 13:
-            self.fpf = 'b'
             self.opf = 'cfb'
             self.apf = 'fb'
-        elif 13 < self.current_step:
             self.fpf = 'b'
-            self.opf = 'cfb'
+        elif 13 < self.current_step:
             self.opf = 'dcfb'
+            self.apf = 'fb'
+            self.fpf = 'b'
 
     def save(self):
         """
@@ -311,8 +316,8 @@ class Shiv(object):
         self.ebroot = self.broot.replace('.fits','.ms.fits')
         # define the prefixes for current file names
         self.opf = ''  # object
-        self.fpf = ''  # flat
         self.apf = ''  # arc
+        self.fpf = ''  # flat
 
     def find_trim_sections(self):
         """
@@ -390,7 +395,8 @@ class Shiv(object):
                 su.apply_flat( reds, 'nflat%d'%i )
                 self.log.info( '\nApplied flat nflat%d to the following files:\n'%i+',\n'.join(reds) )
 
-        self.opf = self.apf = 'fb' # f for flatfielded
+        self.opf = 'fb' # f for flatfielded
+        self.apf = 'fb'
 
     def reject_cosmic_rays(self):
         """
@@ -605,14 +611,14 @@ class Shiv(object):
         su.reid_arc( firstobjarc, 'Combined_0.5_Arc.ms.fits')
         self.log.info("ID'd "+firstobjarc+" using Combined_0.5_Arc.ms.fits as a reference")
 
-        # now go through all other red arcs automatically
+        # Now go through all other red arcs, using the result of the above step to calibrate them.
         allgroups = set([o[2] for o in self.objects])
         allgroups.remove(1)    # skip the blues
-        allgroups.remove( self.robjects[0][2] )    # and the first object's arcs
+        allgroups.remove( self.robjects[0][2] )    # and skip the first object's arcs
         for i in allgroups:
             objarc = [self.apf+self.erroot%o[0] for o in self.rarcs if o[2]==i][0]
-            su.reid_arc( objarc, 'Combined_0.5_Arc.ms.fits', interact=True )
-            self.log.info("ID'd "+objarc+" using Combined_0.5_Arc.ms.fits as a reference")
+            su.reid_arc( objarc, firstobjarc )
+            self.log.info("ID'd "+objarc+" using "+firstobjarc+" as a reference")
 
     def apply_wavelength(self):
         """
