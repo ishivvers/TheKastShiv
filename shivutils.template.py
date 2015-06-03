@@ -577,7 +577,7 @@ def extract( image, side, arc=False, interact=True, reference=None, trace_only=F
      Note: using either arc or reference keys will override the apfile.
     Any additional keyword arguments will be passed along to iraf.apall directly, overriding any built-in defaults. 
      Common keywords include:
-     - line_number: the column number to use to define the aperture (helpful for nebular spectra)
+     - line: the column number to use to define the aperture (helpful for nebular spectra)
      - nsum: the number of adjacent columns to sum (or median, if nsum<0) to define the aperture
      - output: if not given, follows IRAF standard and sticks ".ms." in middle of filename (for "multispec").
      See here for an exhaustive list: http://iraf.net/irafhelp.php?val=apextract.apall&help=Help+Page

@@ -218,11 +218,14 @@ class Shiv(object):
         self.build_lists()
         self.log.info('Ignoring all files associated with '+objname)
     
-    def build_lists(self):
+    def build_lists(self, logfile=None):
         """
         Creates the intermediate lists for objects, arcs, and flats.
         Must be run at the beginning, and every time the self.objects/arcs/flats lists are modified.
+        If a logfile path is given, will rebuild all lists from that logfile.
         """
+        if logfile:
+            self.objects, self.arcs, self.flats = su.wiki2elog( runID=self.runID, infile=logfile )
         # re-define the file lists
         self.robjects = [o for o in self.objects if o[1]==2]
         self.bobjects = [o for o in self.objects if o[1]==1]
@@ -301,14 +304,16 @@ class Shiv(object):
         else:
             raise StandardError( 'Improper arguments! Need one of logfile or dateUT' )
 
-    def define_lists(self):
+    def define_lists(self, logfile=None):
         """
         Parses the output of wiki2elog into the formats needed here;
          must have self.objects, self.flats, self.arcs defined (output of wiki2elog).
+        If given a logfile path, will use that logfile to build the lists (useful when
+            restarting an aborted run.)
         """
         self.log.info('Populating file lists from log')
         # define the file lists
-        self.build_lists()
+        self.build_lists( logfile=logfile )
 
         # define the root filenames for each side
         self.rroot = '%sred'%self.runID + '%.3d.fits'        # before extraction
@@ -647,6 +652,8 @@ class Shiv(object):
         Calculate the seeing for all objects and insert values into their header.
         """
         self.log.info("Calculating seeing for all objects")
+        allobjects = [self.opf+self.ebroot%o[0] for o in self.bobjects] +\
+                     [self.opf+self.erroot%o[0] for o in self.robjects]
         blue_std_dict, red_std_dict = su.match_science_and_standards( allobjects )
         su.calculate_seeing( blue_std_dict, red_std_dict, plot=self.interactive )
     
