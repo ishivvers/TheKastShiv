@@ -1,6 +1,6 @@
 """
 The Kast Shiv: a Kast spectrocscopic reduction pipeline
- written by I.Shivvers (modified from the K.Clubb/J.Silverman/T.Matheson
+ written by I.Shivvers (modified from the K.Clubb/J.Silverman/R.Foley/R.Chornock/T.Matheson
  pipeline and the B.Cenko pipeline - thanks everyone).
 """
 
@@ -831,7 +831,7 @@ class Shiv(object):
 
     def join(self, files=None, globstr=None, ftype='fits'):
         """
-        Join red+blue sides of a set of .flm files.  If given globstr, looks for red (ir) and
+        Join red+blue sides of a set of files.  If given globstr, looks for red (ir) and
          blue (uv) versions with that globstring.  If given files (a list of [blue, red]),
          will simply join those. ftype can be one of ["fits" or "flm"].
         """

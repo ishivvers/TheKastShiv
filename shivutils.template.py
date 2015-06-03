@@ -5,8 +5,8 @@ Utilities library for the Kast Shiv
 Author: Isaac Shivvers, ishivvers@berkeley.edu
 
 Steals heavily from Brad Cenko's kast_redux and iqutils packages,
-as well as the Matheson/Foley/Silverman/Clubb reduction pipeline.
-(Thanks John, Ryan, Jeff, and Kelsey!)
+as well as the K.Clubb/J.Silverman/R.Foley/R.Chornock/T.Matheson reduction pipeline.
+(Thanks everyone!)
 More information on that pipeline, and the reasoning behind it,
 here: http://heracles.astro.berkeley.edu/wiki/doku.php?id=kast_reduction_guide
 
@@ -18,11 +18,6 @@ Notes:
     minima in the standard star spectra, afterwhich you can fit
     with spectools.
  - e.g.: mins = scipy.signal.argrelmin( fl, order=25 )
-
-
-to do: 
- - for all standard stars, fit for the seeing and find the time,
-   and then for all objects insert the seeing as the interpolated value.
 """
 
 ######################################################################
@@ -987,6 +982,8 @@ def coadd( files, save=True, fname=None ):
      arrays are different will interpolate all spectra onto the region covered
      by all input spectra, rebinning all data to the same resolution first if needed
      (using the resolution of the lowest-resolution spectrum).
+    If save is True, will save a fits file of the coadded input fits files, with a 
+     properly-updated header.
     Returns numpy arrays of wavelength, flux, and error.
     """
     hdus = [pf.open(f) for f in files]
