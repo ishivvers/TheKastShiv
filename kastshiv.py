@@ -60,6 +60,7 @@ class Shiv(object):
                       self.extract_arc_spectra,
                       self.id_arcs,
                       self.apply_wavelength,
+                      self.calculate_seeing,
                       self.flux_calibrate,
                       self.coadd_join_output,
                       self.plt_flams]
@@ -640,6 +641,14 @@ class Shiv(object):
             su.disp_correct( self.opf+self.erroot%o[0], redarc )
             self.log.info("Applied wavelength solution from "+redarc+" to "+self.opf+self.erroot%o[0])
         self.opf = 'dcfb' # d for dispersion-corrected
+
+    def calc_seeing(self):
+        """
+        Calculate the seeing for all objects and insert values into their header.
+        """
+        self.log.info("Calculating seeing for all objects")
+        blue_std_dict, red_std_dict = su.match_science_and_standards( allobjects )
+        su.calculate_seeing( blue_std_dict, red_std_dict, plot=self.interactive )
     
     def flux_calibrate(self, side=None):
         """

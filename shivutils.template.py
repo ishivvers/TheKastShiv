@@ -18,6 +18,11 @@ Notes:
     minima in the standard star spectra, afterwhich you can fit
     with spectools.
  - e.g.: mins = scipy.signal.argrelmin( fl, order=25 )
+
+
+to do: 
+ - for all standard stars, fit for the seeing and find the time,
+   and then for all objects insert the seeing as the interpolated value.
 """
 
 ######################################################################
@@ -35,7 +40,8 @@ from dateutil import parser as date_parser
 from BeautifulSoup import BeautifulSoup
 from difflib import get_close_matches
 from time import sleep
-from astro.iAstro import smooth
+from copy import copy
+from astro.iAstro import smooth,fit_gaussian
 import urllib
 import os
 import re
@@ -50,6 +56,7 @@ import credentials
 ######################################################################
 
 # kast parameters
+# pulled from previous codes or from https://mthamilton.ucolick.org/techdocs/instruments/kast/kast_quickReference.html
 REDGAIN=3.0
 REDRDNOISE=12.5
 BLUEBIAS1='[2052:2080,*]'
@@ -58,6 +65,8 @@ BLUEGAIN1=1.2
 BLUEGAIN2=1.237
 BLUERDNOISE=3.7
 KASTAPFACT=1.8558
+REDPIXSCALE=0.78 #arcsec/pix in spatial scale
+BLUEPIXSCALE=0.43
 
 # give the path to the IDL executable and home folders
 ## THIS PART FILLED IN BY SETUP.PY ##
@@ -482,7 +491,7 @@ def apply_flat(images, flat, prefix='f' ):
 
 def update_headers(images):
     """
-    run fixhead (custom IRAF task) and calculate the airmass values
+    Run fixhead (custom IRAF task) and calculate the airmass values.
     """
     for image in images:
         iraf.kastfixhead(image)
@@ -868,6 +877,62 @@ def match_science_and_standards( allobjects ):
         red_outdict[ std_match ].append( fname )
                
     return blue_outdict, red_outdict
+
+######################################################################
+
+def calculate_seeing( blue_dict, red_dict, plot=False ):
+    """
+    Given the outputs of match_science_and_standards(), 
+     will go through all standards and calculate the seeing and record the time of observation.
+    The seeing observed nearest the time of each object observation will then be calculated
+     and inserted into the header.
+    """
+    std_times, std_seeing = [], []
+    # calculate the seeing for each standard
+    for k in blue_dict.keys():
+        h = pf.open( k )
+        # calculate the FWHM at three points and take the median
+        s = h[0].data.shape[1]/4
+        fwhms = []
+        for i in range(1,4):
+            if plot:
+                plt.figure()
+                plt.ylabel('Blue seeing calculation %d'%i)
+            fwhms.append( fit_gaussian(np.arange(h[0].data.shape[0]), h[0].data[:,i*s], plot=plot)[0]['FWHM'] )
+        seeing = np.median( fwhms ) * BLUEPIXSCALE
+        obstime = date_parser.parse( h[0].header['DATE-OBS'] )
+        std_times.append( obstime )
+        std_seeing.append( seeing )
+        print 'Calculated: seeing ~',seeing,'for image',k
+        head_update( k, 'SEEING', seeing )
+    for k in red_dict.keys():
+        h = pf.open( k )
+        # calculate the FWHM at three points and take the median
+        s = h[0].data.shape[1]/4
+        fwhms = []
+        for i in range(1,4):
+            if plot:
+                plt.figure()
+                plt.ylabel('Red seeing calculation %d'%i)
+            fwhms.append( fit_gaussian(np.arange(h[0].data.shape[0]), h[0].data[:,i*s], plot=plot)[0]['FWHM'] )
+        seeing = np.median( fwhms ) * REDPIXSCALE
+        obstime = date_parser.parse( h[0].header['DATE-OBS'] )
+        std_times.append( obstime )
+        std_seeing.append( seeing )
+        print 'Calculated: seeing ~',seeing,'for image',k
+        head_update( k, 'SEEING', seeing )
+
+    # now go through all objects and find the time, and match to a seeing measurement
+    all_dict = copy(blue_dict)
+    all_dict.update(red_dict)
+    for k in all_dict.keys():
+        for obj in all_dict[k]:
+            h = pf.open( obj )
+            obstime = date_parser.parse( h[0].header['DATE-OBS'] )
+            dtimes = [abs( (obstime - t).total_seconds() ) for t in std_times]
+            seeing = std_seeing[ np.argmin(dtimes) ]
+            print 'Calculated: seeing ~',seeing,'for image',obj
+            head_update( obj, 'SEEING', seeing )
 
 ######################################################################
 
