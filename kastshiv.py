@@ -60,7 +60,7 @@ class Shiv(object):
                       self.extract_arc_spectra,
                       self.id_arcs,
                       self.apply_wavelength,
-                      self.calculate_seeing,
+                      self.calc_seeing,
                       self.flux_calibrate,
                       self.coadd_join_output,
                       self.plt_flams]

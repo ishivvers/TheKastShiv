@@ -38,7 +38,6 @@ You need to include the following commands in your `bash` login file (e.g., `~/.
     export IDL_PATH=$IDL_PATH:+<KAST_SHIV_DIRECTORY>/tools
     export PYTHONPATH=$PYTHONPATH:<KAST_SHIV_DIRECTORY>
 
-
 ### create the `credentials.py` file ###
 
 There must exist a file named `credentials.py` in the KastShiv folder, and in
@@ -50,6 +49,7 @@ and the flipperwiki.  For example:
 	wiki_pw = 'PASSWORD'
 	repository_un = 'USERNAME'
 	repository_pw = 'PASSWORD'
+
 
 ### to do ###
 
