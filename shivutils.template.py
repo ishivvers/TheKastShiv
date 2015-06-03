@@ -36,15 +36,15 @@ from BeautifulSoup import BeautifulSoup
 from difflib import get_close_matches
 from time import sleep
 from copy import copy
-from astro.iAstro import smooth,fit_gaussian
 import urllib
 import os
 import re
 
 
 # local
-import cosmics as cr
-import credentials
+from tools import cosmics as cr
+from tools import credentials
+from tools.astrotools import smooth,fit_gaussian
 
 ######################################################################
 # global variables and IRAF import
@@ -890,10 +890,9 @@ def calculate_seeing( blue_dict, red_dict, plot=False ):
         s = h[0].data.shape[1]/4
         fwhms = []
         for i in range(1,4):
-            if plot:
-                plt.figure()
-                plt.ylabel('Blue seeing calculation %d'%i)
             fwhms.append( fit_gaussian(np.arange(h[0].data.shape[0]), h[0].data[:,i*s], plot=plot)[0]['FWHM'] )
+            if plot:
+                plt.title('Blue seeing calculation %d'%i)
         seeing = np.median( fwhms ) * BLUEPIXSCALE
         obstime = date_parser.parse( h[0].header['DATE-OBS'] )
         std_times.append( obstime )
@@ -906,10 +905,9 @@ def calculate_seeing( blue_dict, red_dict, plot=False ):
         s = h[0].data.shape[1]/4
         fwhms = []
         for i in range(1,4):
-            if plot:
-                plt.figure()
-                plt.ylabel('Red seeing calculation %d'%i)
             fwhms.append( fit_gaussian(np.arange(h[0].data.shape[0]), h[0].data[:,i*s], plot=plot)[0]['FWHM'] )
+            if plot:
+                plt.title('Red seeing calculation %d'%i)
         seeing = np.median( fwhms ) * REDPIXSCALE
         obstime = date_parser.parse( h[0].header['DATE-OBS'] )
         std_times.append( obstime )

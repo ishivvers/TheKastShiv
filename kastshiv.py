@@ -11,7 +11,7 @@ import os
 import re
 import logging
 import pickle
-import check_log
+from tools import check_log
 from glob import glob
 from copy import copy
 import numpy as np
