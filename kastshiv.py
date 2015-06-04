@@ -812,7 +812,7 @@ class Shiv(object):
                 continue
             wl,fl,er = su.join( blue, red, interactive=self.interactive )
             self.log.info('Joined '+fblue+' to '+fred)
-            output_name = fred.replace('ir','uvir').replace('.ms.fits','.flm')
+            output_name = fred.replace('ir','ui').replace('.ms.fits','.flm')
             
             # should we save the result?
             su.plot_spectra( wl,fl,er, title=namedate )
