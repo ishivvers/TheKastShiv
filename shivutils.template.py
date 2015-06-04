@@ -10,7 +10,7 @@ as well as the K.Clubb/J.Silverman/R.Foley/R.Chornock/T.Matheson reduction pipel
 More information on that pipeline, and the reasoning behind it,
 here: http://heracles.astro.berkeley.edu/wiki/doku.php?id=kast_reduction_guide
 
-Best if run using the Ureka Python setup:
+Requires a working installation of IDL and the Ureka Python setup:
 http://ssb.stsci.edu/ureka/
 
 Notes:
@@ -420,7 +420,7 @@ def bias_correct(images, y1, y2, prefix=None):
             # join the two sides back together
             corrected_data = np.hstack( (corrected_data1, corrected_data2) )
         
-        # remove the DATASEC keyheader keywork if it exists
+        # remove the DATASEC keyheader keyword if it exists
         try:
             fits.header.pop('DATASEC')
         except KeyError:
@@ -968,7 +968,7 @@ def read_calfits( f ):
 
 def coadd( files, save=True, fname=None ):
     """
-    Reads in a list of fits file namess (file formats as expected from flux-calibrated
+    Reads in a list of fits file names (file formats as expected from flux-calibrated
      spectra, after using the IDL routine cal.pro).
     Converts all input specta into units of [flux * time], adds them, and then divides
      by the total time to return a spectrum in units of [flux].  If the wavelength 

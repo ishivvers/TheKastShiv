@@ -259,6 +259,7 @@ class Shiv(object):
         """
         self.log.info('Creating file system for run %s'%self.runID)
         su.make_file_system( self.runID )
+        Print 'Moving into %s directory'%self.runID
         os.chdir( self.runID )
 
     def get_data(self, datePT=None, creds=None):
@@ -270,12 +271,14 @@ class Shiv(object):
         """
         if datePT == None:
             datePT = self.datePT
+        Print 'Moving into rawdata directory.'
         self.log.info('Downloading data for %s'%datePT)
         os.chdir( 'rawdata' )
         if creds == None:
             su.get_kast_data( datePT )
         else:
             su.get_kast_data( datePT, un=creds[0], pw=creds[1] )
+        Print 'Moving into working directory'
         os.chdir( '../working' )
 
     def move_data(self, dateUT=None, logfile=None, pagename=None):
@@ -584,7 +587,7 @@ class Shiv(object):
         """
         Use iraf's splot to view a 1d fits file spectrum
         """
-        su.splot( filename )
+        su.iraf.splot( filename )
 
     def extract_arc_spectra(self):
         """
@@ -700,6 +703,7 @@ class Shiv(object):
         for f in ending_files:
             if f not in starting_files:
                 su.run_cmd(' mv %s ../final/.' %f )
+        print 'Moving to final directory.'
         os.chdir( '../final' )
 
     def coadd_join_output(self, globstr=''):
