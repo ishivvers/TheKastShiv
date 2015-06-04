@@ -1,31 +1,32 @@
 ## The Kast Shiv ##
 
-_fast, easy, effective_
-
-
 This is the Isaac version of the
 Flipper group's Kast/Shane reduction pipeline.
 
 
-### goals of this new code ###
+### goals of this code ###
 
-- highly automated
+- as automated as is reasonable
 - cuts no corners
 - does not require a complicated environment
 - lots of documentation
 - easy to start/stop/resume at any point in the reduction
-- robust to errors
-- secondary: does not require IDL
+- secondary goal: does not require IDL
 
 ## Getting it running ##
 
 First, install the [Ureka Python/IRAF](http://ssb.stsci.edu/ureka/) system.
 Or, if you're feeling very brave, install Python, IRAF, and pyraf yourself, and get
 them to all cooperate.
- 
+
+There are some additional packages required too: Python will notify you the 
+first time it's run.  Install them using 'pip install' from within the Ureka environment.
+
 ### run setup.py ###
 
-You will need to know the path to your IDL executable
+The setup.py code inserts appropriate paths into files where needed.
+You should place the code into its permanent home and then run this script.
+The script must be run every time the code is moved.
 
     # from KastShiv root folder
     python setup.py
@@ -44,7 +45,7 @@ There must exist a file named `credentials.py` in the KastShiv folder, and in
 that file there must live the credentials for logging into the Kast data repository
 and the flipperwiki.  For example:
 
-    # credentials.py
+    >$ echo credentials.py
     wiki_un = 'USERNAME'
 	wiki_pw = 'PASSWORD'
 	repository_un = 'USERNAME'
@@ -53,3 +54,5 @@ and the flipperwiki.  For example:
 
 ### to do ###
 
+Fix windowing error in IDL code during telluric correction
+ (adjusting window size fails).
