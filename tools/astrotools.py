@@ -6,6 +6,8 @@ Library of tools pulled from the I.Shivvers iAstro package.
 
 from scikits import datasmooth
 from scipy.optimize import curve_fit
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 def smooth( x, y, width=None, window='hanning' ):

@@ -56,11 +56,11 @@ class Shiv(object):
                       self.make_flats,
                       self.apply_flats,
                       self.reject_cosmic_rays,
+                      self.calc_seeing,
                       self.extract_object_spectra,
                       self.extract_arc_spectra,
                       self.id_arcs,
                       self.apply_wavelength,
-                      self.calc_seeing,
                       self.flux_calibrate,
                       self.coadd_join_output,
                       self.plt_flams]
@@ -102,23 +102,28 @@ class Shiv(object):
             self.current_step = int(raw_input())
             self.summary()
         # handle the prefixes properly
-        if self.current_step <= 5:
+        if self.current_step <= self.steps.index( self.trim_and_bias_correct ):
+            # have not yet changed any prefixes
             self.opf = ''
             self.apf = ''
             self.fpf = ''
-        elif 5 < self.current_step <= 9:
+        elif self.steps.index( self.trim_and_bias_correct ) < self.current_step <= self.steps.index( self.apply_flats ):
+            # have performed bias correction
             self.opf = 'b'
             self.apf = 'b'
             self.fpf = 'b'
-        elif 8 < self.current_step <= 9 :
+        elif self.steps.index( self.apply_flats ) < self.current_step <= self.steps.index( self.reject_cosmic_rays ):
+            # have performed bias correction and flatfielding
             self.opf = 'fb'
             self.apf = 'fb'
             self.fpf = 'b'
-        elif 9 < self.current_step <= 13:
+        elif self.steps.index( self.reject_cosmic_rays ) < self.current_step <= self.steps.index( self.apply_wavelength ):
+            # have performed bias correction, flatfielding, and cosmic ray removal
             self.opf = 'cfb'
             self.apf = 'fb'
             self.fpf = 'b'
-        elif 13 < self.current_step:
+        elif self.steps.index( self.apply_wavelength ) < self.current_step:
+            # have performed bias correction, flatfielding, and cosmic ray removal, and performed a dispersion correction
             self.opf = 'dcfb'
             self.apf = 'fb'
             self.fpf = 'b'
@@ -349,9 +354,11 @@ class Shiv(object):
         reds = [self.opf+self.rroot%o[0] for o in self.robjects+self.rflats+self.rarcs]
         su.bias_correct( reds, self.r_ytrim[0], self.r_ytrim[1] )
 
-        self.opf = self.fpf = self.apf = 'b' # b for bias-subtracted
         self.log.info( '\nApplied trim section (%.4f, %.4f) to following files:\n'%(self.b_ytrim[0], self.b_ytrim[1])+',\n'.join(blues) )
         self.log.info( '\nApplied trim section (%.4f, %.4f) to following files:\n'%(self.r_ytrim[0], self.r_ytrim[1])+',\n'.join(reds) )
+        self.opf = 'b'# b for bias-subtracted
+        self.apf = 'b' 
+        self.fpf = 'b'
 
     def update_headers(self):
         """
@@ -419,6 +426,15 @@ class Shiv(object):
         self.log.info( '\nRemoved cosmic rays from the following files:\n'+',\n'.join(reds) )
 
         self.opf = 'cfb'  # c for cosmic-ray removal
+
+    def calc_seeing(self):
+        """
+        Calculate the seeing for all objects and insert values into their header.
+        """
+        self.log.info("Calculating seeing for all objects")
+        allobjects = [self.opf+self.broot%o[0] for o in self.bobjects] +\
+                     [self.opf+self.rroot%o[0] for o in self.robjects]
+        su.calculate_seeing( allobjects, plot=self.interactive )
 
     def extract_object_spectra(self, side=['red','blue']):
         """
@@ -647,16 +663,6 @@ class Shiv(object):
             self.log.info("Applied wavelength solution from "+redarc+" to "+self.opf+self.erroot%o[0])
         self.opf = 'dcfb' # d for dispersion-corrected
 
-    def calc_seeing(self):
-        """
-        Calculate the seeing for all objects and insert values into their header.
-        """
-        self.log.info("Calculating seeing for all objects")
-        allobjects = [self.opf+self.ebroot%o[0] for o in self.bobjects] +\
-                     [self.opf+self.erroot%o[0] for o in self.robjects]
-        blue_std_dict, red_std_dict = su.match_science_and_standards( allobjects )
-        su.calculate_seeing( blue_std_dict, red_std_dict, plot=self.interactive )
-    
     def flux_calibrate(self, side=None):
         """
         Determine and apply the relevant flux calibration to all objects.
@@ -769,14 +775,14 @@ class Shiv(object):
             if len(redmatches) > 1:
                 inn = raw_input( 'Combine the following files: \n'+str(redmatches)+'? [y/n] (y):\n' )
                 if 'n' not in inn:
-                    red = list(su.coadd( redmatches ))
-                    self.log.info( 'Coadded the following files: '+str(redmatches))
                     # need to update the filename to show that it was averaged
                     # assumes that all were observed on the same day
                     f_timestr = re.search( '\.\d{3}', fred ).group()
                     avg_time = np.mean( [float(re.search('\.\d{3}', fff).group()) for fff in redmatches] )
                     new_timestr = ('%.3f'%avg_time)[1:] #drop the leading 0
                     fred = fred.replace( f_timestr, new_timestr )
+                    red = list(su.coadd( redmatches, fname=fred ))
+                    self.log.info( 'Coadded the following files: '+str(redmatches))
                 else:
                     print 'Choose which file you want:'
                     for i,f in enumerate(redmatches): print i,':::',f
@@ -832,7 +838,7 @@ class Shiv(object):
             avg_time = np.mean( [float(re.search('\.\d{3}', fff).group()) for fff in files] )
             new_timestr = ('%.3f'%avg_time)[1:] #drop the leading 0
             fname = files[0].replace( f_timestr, new_timestr )
-            wl,fl,er = su.coadd( bluematches )
+            wl,fl,er = su.coadd( bluematches, fname=fname )
             su.np2flm( fname, wl,fl,er )
             self.log.info( 'Co-addition of %s saved to file %s'%(str(files), fname) )
 

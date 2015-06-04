@@ -31,6 +31,7 @@ import pyfits as pf
 from pidly import IDL
 from glob import glob
 from scipy.optimize import minimize
+from datetime import datetime
 from dateutil import parser as date_parser
 from BeautifulSoup import BeautifulSoup
 from difflib import get_close_matches
@@ -39,7 +40,6 @@ from copy import copy
 import urllib
 import os
 import re
-
 
 # local
 from tools import cosmics as cr
@@ -494,6 +494,53 @@ def update_headers(images):
 
 ############################################################################
 
+def calculate_seeing( allfiles, plot=False ):
+    """
+    Given a list of files, will find the standards from them and calculate the seeing
+     and observation time of each.
+    The seeing observed nearest the time of each object observation will then be calculated
+     and inserted into the header.
+    """
+    std_times, std_seeing = [], []
+    # calculate the seeing for each standard
+    for f in allfiles:
+        std = id_standard( head_get(f, 'object' )[0] )
+        if not std:
+            # not a standard
+            continue
+        side = {1:'blue',2:'red'}[std[1]]
+        h = pf.open( f )
+        # calculate the FWHM at three points and take the median
+        s = h[0].data.shape[1]/4
+        fwhms = []
+        for i in range(1,4):
+            fwhms.append( fit_gaussian(np.arange(h[0].data.shape[0]), h[0].data[:,i*s], plot=plot)[0]['FWHM'] )
+            if plot:
+                plt.title('%s seeing calculation %d'%(side,i))
+        if side == 'blue':
+            seeing = np.median( fwhms ) * BLUEPIXSCALE
+        else:
+            seeing = np.median( fwhms ) * REDPIXSCALE
+        obstime = date_parser.parse( h[0].header['DATE-OBS'] )
+        std_times.append( obstime )
+        std_seeing.append( seeing )
+        print 'Calculated: seeing ~',seeing,'for image',f
+        head_update( f, 'SEEING', round(seeing,2) )
+
+    # now go through all non-standards and find the time, and match to a seeing measurement
+    for f in allfiles:
+        if id_standard( head_get(f, 'object' )[0] ):
+            # a standard
+            continue
+        h = pf.open( f )
+        obstime = date_parser.parse( h[0].header['DATE-OBS'] )
+        dtimes = [abs( (obstime - t).total_seconds() ) for t in std_times]
+        seeing = std_seeing[ np.argmin(dtimes) ]
+        print 'Associated: seeing ~',seeing,'for image',f
+        head_update( f, 'SEEING', round(seeing,2) )
+
+############################################################################
+
 def combine_arcs( arcs, output ):
     """
     simply combine a set of arc images into a single image
@@ -873,61 +920,9 @@ def match_science_and_standards( allobjects ):
                
     return blue_outdict, red_outdict
 
-######################################################################
-
-def calculate_seeing( blue_dict, red_dict, plot=False ):
-    """
-    Given the outputs of match_science_and_standards(), 
-     will go through all standards and calculate the seeing and record the time of observation.
-    The seeing observed nearest the time of each object observation will then be calculated
-     and inserted into the header.
-    """
-    std_times, std_seeing = [], []
-    # calculate the seeing for each standard
-    for k in blue_dict.keys():
-        h = pf.open( k )
-        # calculate the FWHM at three points and take the median
-        s = h[0].data.shape[1]/4
-        fwhms = []
-        for i in range(1,4):
-            fwhms.append( fit_gaussian(np.arange(h[0].data.shape[0]), h[0].data[:,i*s], plot=plot)[0]['FWHM'] )
-            if plot:
-                plt.title('Blue seeing calculation %d'%i)
-        seeing = np.median( fwhms ) * BLUEPIXSCALE
-        obstime = date_parser.parse( h[0].header['DATE-OBS'] )
-        std_times.append( obstime )
-        std_seeing.append( seeing )
-        print 'Calculated: seeing ~',seeing,'for image',k
-        head_update( k, 'SEEING', seeing )
-    for k in red_dict.keys():
-        h = pf.open( k )
-        # calculate the FWHM at three points and take the median
-        s = h[0].data.shape[1]/4
-        fwhms = []
-        for i in range(1,4):
-            fwhms.append( fit_gaussian(np.arange(h[0].data.shape[0]), h[0].data[:,i*s], plot=plot)[0]['FWHM'] )
-            if plot:
-                plt.title('Red seeing calculation %d'%i)
-        seeing = np.median( fwhms ) * REDPIXSCALE
-        obstime = date_parser.parse( h[0].header['DATE-OBS'] )
-        std_times.append( obstime )
-        std_seeing.append( seeing )
-        print 'Calculated: seeing ~',seeing,'for image',k
-        head_update( k, 'SEEING', seeing )
-
-    # now go through all objects and find the time, and match to a seeing measurement
-    all_dict = copy(blue_dict)
-    all_dict.update(red_dict)
-    for k in all_dict.keys():
-        for obj in all_dict[k]:
-            h = pf.open( obj )
-            obstime = date_parser.parse( h[0].header['DATE-OBS'] )
-            dtimes = [abs( (obstime - t).total_seconds() ) for t in std_times]
-            seeing = std_seeing[ np.argmin(dtimes) ]
-            print 'Calculated: seeing ~',seeing,'for image',obj
-            head_update( obj, 'SEEING', seeing )
-
-######################################################################
+############################################################################
+# calibrating and finishing
+############################################################################
 
 def calibrate_idl( input_dict, idlpath=IDLPATH, cleanup=True ):
     """
