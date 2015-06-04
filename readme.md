@@ -41,7 +41,7 @@ You need to include the following commands in your `bash` login file (e.g., `~/.
 
 ### create the `credentials.py` file ###
 
-There must exist a file named `credentials.py` in the KastShiv folder, and in
+There must exist a file named `credentials.py` in the KastShiv/tools folder, and in
 that file there must live the credentials for logging into the Kast data repository
 and the flipperwiki.  For example:
 
