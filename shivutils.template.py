@@ -579,7 +579,7 @@ def reid_arc(arc, reference, interact=True, coordlist=COORDLIST):
         interactive = yes
     else:
         interactive = no
-    iraf.reidentify(reference, arc, coordlist=coordlist, interactive=interact,
+    iraf.reidentify(reference, arc, coordlist=coordlist, interactive=interactive,
                     newaps=no, override=yes, refit=no, cradius=6, verbose=yes)
 
 ############################################################################
