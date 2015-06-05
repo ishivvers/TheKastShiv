@@ -259,7 +259,7 @@ class Shiv(object):
         """
         self.log.info('Creating file system for run %s'%self.runID)
         su.make_file_system( self.runID )
-        Print 'Moving into %s directory'%self.runID
+        print 'Moving into %s directory'%self.runID
         os.chdir( self.runID )
 
     def get_data(self, datePT=None, creds=None):
@@ -271,14 +271,14 @@ class Shiv(object):
         """
         if datePT == None:
             datePT = self.datePT
-        Print 'Moving into rawdata directory.'
+        print 'Moving into rawdata directory.'
         self.log.info('Downloading data for %s'%datePT)
         os.chdir( 'rawdata' )
         if creds == None:
             su.get_kast_data( datePT )
         else:
             su.get_kast_data( datePT, un=creds[0], pw=creds[1] )
-        Print 'Moving into working directory'
+        print 'Moving into working directory'
         os.chdir( '../working' )
 
     def move_data(self, dateUT=None, logfile=None, pagename=None):
