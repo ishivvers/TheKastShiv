@@ -113,24 +113,12 @@ repeat begin
     oplot,  wave,  newspect,  psym = 10, color = col.white
     
     if (nlag GT 0) then begin
-        read, 'Is this ok? (y/n/w, default=y, w to change window size) ', answer
+        read, 'Is this ok? (y/n, default=y) ', answer
         answer = strlowcase(answer)
         if (answer EQ 'n') then begin
             angshift = ''
             read,  'Enter B-star shift in Angstroms: ',  angshift
             angshift = float(angshift)
-        endif
-        if (answer eq 'w') then begin
-            print
-            print, '  Choose your window :  '
-            myplot2, wave, spect, wave, newspect, color = col.red, $
-              ocolor = col.white, xrange = [xmin, xmax], $
-              yrange = [ymin, ymax]
-            xmax = !x.crange[1]
-            xmin = !x.crange[0]
-            ymax = !y.crange[1]
-            ymin = !y.crange[0]
-            ok = 0
         endif
     endif
 
