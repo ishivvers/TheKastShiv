@@ -619,7 +619,7 @@ class Shiv(object):
         # ID the blue side arc
         su.run_cmd( 'gnome-open %s'%su.BLUEARCIMG, ignore_errors=True )
         bluearc = self.apf+self.ebroot%(self.barcs[0][0])
-        su.id_arc( bluearc )
+        su.id_arc( bluearc, side='b' )
         self.log.info("Successfully ID'd "+bluearc)
 
         # sum the R1 and R2 red arcs from the beginning of the night and id the result
@@ -627,7 +627,7 @@ class Shiv(object):
         R1R2 = [self.apf+self.erroot%o[0] for o in self.rarcs][:2]
         su.combine_arcs( R1R2, 'Combined_0.5_Arc.ms.fits' )
         self.log.info("Created Combined_0.5_Arc.ms.fits from "+str(R1R2))
-        su.id_arc( 'Combined_0.5_Arc.ms.fits' )
+        su.id_arc( 'Combined_0.5_Arc.ms.fits', side='r' )
         self.log.info("Successfully ID'd Combined_0.5_Arc.ms.fits" )
 
         # ID the first red object arc interactively, making sure

@@ -555,12 +555,17 @@ def combine_arcs( arcs, output ):
 
 ############################################################################
 
-def id_arc(arc, coordlist=COORDLIST):
+def id_arc(arc, side='b', coordlist=COORDLIST):
 
     '''
     Construct reference wavelength solution from arc lamps
     '''
-    iraf.identify(arc, coordlist=coordlist, function="legendre", order=4)
+    if side == 'r':
+        order = 6
+    elif side == 'b':
+        order = 4
+    iraf.identify(arc, coordlist=coordlist, function="legendre", order=order,
+                  fwidth=5, cradius=5, )
 
 ############################################################################
 
@@ -574,7 +579,8 @@ def reid_arc(arc, reference, interact=True, coordlist=COORDLIST):
         interactive = yes
     else:
         interactive = no
-    iraf.reidentify(reference, arc, coordlist=coordlist, interactive=interactive, override=yes)
+    iraf.reidentify(reference, arc, coordlist=coordlist, interactive=interact,
+                    newaps=no, override=yes, refit=no, cradius=6, verbose=yes)
 
 ############################################################################
 
