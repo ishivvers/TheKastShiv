@@ -701,7 +701,7 @@ class Shiv(object):
 
         ending_files = glob('*.fits')
         for f in ending_files:
-            if f not in starting_files:
+            if f not in starting_files and if f[:5] != 'cdcfb':
                 su.run_cmd(' mv %s ../final/.' %f )
         print 'Moving to final directory.'
         os.chdir( '../final' )
@@ -823,7 +823,7 @@ class Shiv(object):
             self.log.info( namedate+' saved to file '+output_name )
             
             # only drop from the list if we got all the way through and successfully saved it
-            allfiles = [f for f in allfiles if not re.search(namedate+'.*', f)]
+            allfiles = [f for f in allfiles if namedate not in f]
 
 
     def coadd(self, files=None, globstr=None):
