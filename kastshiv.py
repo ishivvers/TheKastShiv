@@ -701,7 +701,7 @@ class Shiv(object):
 
         ending_files = glob('*.fits')
         for f in ending_files:
-            if f not in starting_files and if f[:5] != 'cdcfb':
+            if (f not in starting_files) and (f[:5] != 'cdcfb'):
                 su.run_cmd(' mv %s ../final/.' %f )
         print 'Moving to final directory.'
         os.chdir( '../final' )
