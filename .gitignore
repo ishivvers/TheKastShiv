@@ -1,3 +1,8 @@
 *.pyc
 credentials.py
-
+## below files are produced from templates by setup.py ##
+shivutils.py
+kastfixhead.cl
+login.cl
+uparm/
+final.pro
