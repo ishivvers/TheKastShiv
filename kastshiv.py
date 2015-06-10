@@ -617,13 +617,13 @@ class Shiv(object):
         """
         self.log.info("Identifying arc lines and fitting for wavelength solutions")
         # ID the blue side arc
-        su.run_cmd( 'gnome-open %s'%su.BLUEARCIMG, ignore_errors=True )
+        su.run_cmd( 'xdg-open %s'%su.BLUEARCIMG, ignore_errors=True )
         bluearc = self.apf+self.ebroot%(self.barcs[0][0])
         su.id_arc( bluearc, side='b' )
         self.log.info("Successfully ID'd "+bluearc)
 
         # sum the R1 and R2 red arcs from the beginning of the night and id the result
-        su.run_cmd( 'gnome-open %s'%su.REDARCIMG, ignore_errors=True )
+        su.run_cmd( 'xdg-open %s'%su.REDARCIMG, ignore_errors=True )
         R1R2 = [self.apf+self.erroot%o[0] for o in self.rarcs][:2]
         su.combine_arcs( R1R2, 'Combined_0.5_Arc.ms.fits' )
         self.log.info("Created Combined_0.5_Arc.ms.fits from "+str(R1R2))
