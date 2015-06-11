@@ -189,7 +189,6 @@ def get_kast_data( datestring, outfile=None, unpack=True,
 
 ############################################################################
 
-
 def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None, infile=None,
                un=credentials.wiki_un, pw=credentials.wiki_pw ):
     """
@@ -275,6 +274,8 @@ def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None, infile=
                 sidenum = int(cols[2].string)
                 groupnum = int(cols[3].string)
                 obstype = cols[4].string.strip()
+                if 'obj' in obstype:
+                    obstype = 'obj' # in case it's named object or something
             except ValueError:
                 # for now, skip over any imaging, etc
                 continue
@@ -284,7 +285,10 @@ def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None, infile=
             if obstype == 'obj':
                 # find the and clean up the object's name
                 # remove anything like a slit width or "IR/UV"
-                objname = cols[1].string.lower().strip().encode('ascii','ignore')
+                try:
+                    objname = cols[1].string.lower().strip().encode('ascii','ignore')
+                except AttributeError:
+                    objname = cols[1].findChild().string.lower().strip().encode('ascii','ignore')
                 for match in re.findall('[UuIi][VvRr]', objname ):
                     objname = objname.replace(match,'')
                 objname = objname.strip().replace(' ','_')
@@ -1060,7 +1064,7 @@ def join( spec1, spec2, scaleside=1, interactive=True ):
         plt.plot( spec1[0][m1], spec1[1][m1], 'b' )
         plt.plot( spec2[0][m2], spec2[1][m2], 'r' )
         print 'Click on the limits of the best overlap area'
-        [x1,y1],[x2,y2] = plt.ginput(n=2)
+        [x1,y1],[x2,y2] = plt.ginput(n=2, timeout=0)
         xmin, xmax = min([x1,x2]), max([x1,x2])
         m1 = (spec1[0] >= xmin) & (spec1[0] <= xmax)
         m2 = (spec2[0] >= xmin) & (spec2[0] <= xmax)
