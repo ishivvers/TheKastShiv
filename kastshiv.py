@@ -724,11 +724,21 @@ class Shiv(object):
         if globstr != '':
             globstr = '*'+globstr
         allfiles = glob(globstr+'*[(uv)(ir)].ms.fits')
+        # ignore fitsfiles for which there exists a *.flm file
+        allflms = glob('*.flm')
+        for f in allflms:
+            objname = f.split('-')[0]
+            for ff in allfiles:
+                if re.search( objname, ff ):
+                    print ff,'already run. Ignoring.'
+                    allfiles.remove( ff )
         
         while True:
             ## choose the file to do
-            print 'Files remaining to process:'
-            for i,f in enumerate(allfiles): print i,':::',f
+            print '\nFiles remaining to process:'
+            for i,f in enumerate(allfiles):
+                if 'uv' in f:
+                    print i,':::',f
             inn = raw_input('\n Choose the number of a spectrum to coadd/join, or q to quit\n')
             if 'q' in inn.lower():
                 break

@@ -44,6 +44,7 @@ import re
 # local
 from tools import cosmics as cr
 from tools import credentials
+from tools import check_log
 from tools.astrotools import smooth,fit_gaussian
 
 ######################################################################
@@ -200,119 +201,19 @@ def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None, infile=
     - outfile: include a path to write out a silverclubb-formatted logfile, if desired
     """
     if infile != None:
-        objects, arcs, flats = [], [], []
-        # parse a local log, skip the header
-        lines = open(infile,'r').readlines()[1:] 
-        for l in lines:
-            if l[0] == '#':
-                continue
-            try:
-                l = l.split()
-                if '-' in l[0]:
-                    lo,hi = map(int, l[0].split('-'))
-                    obsnums = range(lo, hi+1)
-                else:
-                    obsnums = [int(l[0])]
-                sidenum = int(l[1])
-                groupnum = int(l[2])
-                obstype = l[3]
-            except ValueError:
-                # for now, skip over any imaging, etc
-                continue
-            # for now, skip anything that's not uvir
-            if sidenum not in [1,2]:
-                continue
-            if obstype == 'obj':
-                objname = l[4]
-                for on in obsnums:
-                    objects.append( [on, sidenum, groupnum, obstype, objname])
-            elif obstype == 'arc':
-                for on in obsnums:
-                    arcs.append( [on, sidenum, groupnum, obstype] )
-            elif obstype == 'flat':
-                for on in obsnums:
-                    flats.append( [on, sidenum, groupnum, obstype] )
-            else:
-                raise StandardError('Error reading log!')
-
+        objects, arcs, flats = check_log.load_elog( infile )
 
     else:
-        # download and parse the online wiki, saving to file if requested
+        # save the log to file for later reference
         if outfile == None:
             outfile = runID+'.log'
         
-        # construct the pagename and credentials request
+        # construct the pagename if not given
         if pagename == None:
             date = date_parser.parse(datestring)
             pagename = "%d_%.2d_kast_%s" %(date.month, date.day, runID)
-        creds = urllib.urlencode({"u" : un, "p" : pw})
-        
-        # open the Night Summary page for the run
-        soup = BeautifulSoup( urllib.urlopen("http://heracles.astro.berkeley.edu/doku.php?id="+pagename,creds) )
-        
-        # make sure the table is there
-        if soup.body.table == None:
-            raise StandardError( "wiki page did not load; are your credentials in order?" )
-        else:
-            rows = soup.body.table.findAll('tr')
 
-        # emulate the SilverClubb table format
-        if outfile != None:
-            output = open(outfile,'w')
-            output.write('Obs      Side   Group  Type     Name\n')
-        
-        objects, arcs, flats = [], [], []
-        for row in rows[1:]: #skip header row
-            cols = row.findAll('td')
-            try:
-                # handle ranges properly
-                if '-' in cols[0].string:
-                    lo,hi = map(int, cols[0].string.split('-'))
-                    obsnums = range(lo, hi+1)
-                else:
-                    obsnums = [int(cols[0].string)]
-                sidenum = int(cols[2].string)
-                groupnum = int(cols[3].string)
-                obstype = cols[4].string.strip()
-                if 'obj' in obstype:
-                    obstype = 'obj' # in case it's named object or something
-            except ValueError:
-                # for now, skip over any imaging, etc
-                continue
-            # for now, skip anything that's not uvir
-            if sidenum not in [1,2]:
-                continue
-            if obstype == 'obj':
-                # find the and clean up the object's name
-                # remove anything like a slit width or "IR/UV"
-                try:
-                    objname = cols[1].string.lower().strip().encode('ascii','ignore')
-                except AttributeError:
-                    objname = cols[1].findChild().string.lower().strip().encode('ascii','ignore')
-                for match in re.findall('[UuIi][VvRr]', objname ):
-                    objname = objname.replace(match,'')
-                objname = objname.strip().replace(' ','_')
-                for on in obsnums:
-                    objects.append( [on, sidenum, groupnum, obstype, objname])
-            elif obstype == 'arc':
-                for on in obsnums:
-                    arcs.append( [on, sidenum, groupnum, obstype] )
-            elif obstype == 'flat':
-                for on in obsnums:
-                    flats.append( [on, sidenum, groupnum, obstype] )
-            else:
-                raise StandardError('Error reading log!')
-
-            # add to output log 
-            if outfile != None:
-                if obstype == 'obj':
-                    output.write( "%s %s %s %s %s\n" %(cols[0].string.strip().ljust(8), cols[2].string.strip().ljust(6),
-                                                    cols[3].string.strip().ljust(6), obstype.ljust(8), objname) )
-                else:
-                    output.write( "%s %s %s %s\n" %(cols[0].string.strip().ljust(8), cols[2].string.strip().ljust(6),
-                                                    cols[3].string.strip().ljust(6), obstype) )
-        if outfile != None:
-            output.close()
+        objects, arcs, flats = check_log.wiki2log( pagename, outfile=outfile )
     
     return objects, arcs, flats
 
@@ -1007,8 +908,20 @@ def coadd( files, save=True, fname=None ):
     totime = sum([float(h[0].header['exptime']) for h in hdus])
     # get obsdate info
     date_fmt = '%Y-%m-%dT%H:%M:%S.%f'
-    obs_begin = min([ datetime.strptime( h[0].header['date-beg'], date_fmt ) for h in hdus ])
-    obs_end = max([ datetime.strptime( h[0].header['date-end'], date_fmt ) for h in hdus ])
+    date_fmt2 = '%Y-%m-%dT%H:%M:%S'
+    try:
+        # the date-beg header was changed at some point
+        datebegin = h[0].header['date-beg']
+    except KeyError:
+        datebegin = h[0].header['date-sta']
+    try:
+        obs_begin = min([ datetime.strptime( datebegin, date_fmt ) for h in hdus ])
+    except ValueError:
+        obs_begin = min([ datetime.strptime( datebegin, date_fmt2 ) for h in hdus ])
+    try:
+        obs_end = max([ datetime.strptime( h[0].header['date-end'], date_fmt ) for h in hdus ])
+    except ValueError:
+        obs_end = max([ datetime.strptime( h[0].header['date-end'], date_fmt2 ) for h in hdus ])
     obs_mid = obs_begin + (obs_end-obs_begin)/2
     # define the output wavelength range; go just over wlmax to make sure it's included
     wl = np.arange( wlmin, wlmax+res/10.0, res )

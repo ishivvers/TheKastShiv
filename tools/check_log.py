@@ -172,6 +172,8 @@ def wiki2log( pagename, outfile=None ):
             sidenum = int(cols[2].string)
             groupnum = int(cols[3].string)
             obstype = cols[4].string.strip()
+            if 'obj' in obstype:
+                obstype = 'obj' # in case it's named object or something
         except ValueError:
             # for now, skip over any imaging, etc
             continue
@@ -181,10 +183,13 @@ def wiki2log( pagename, outfile=None ):
         if obstype == 'obj':
             # find the and clean up the object's name
             # remove anything like a slit width or "IR/UV"
-            objname = cols[1].string.encode('ascii','ignore').lower().strip()
+            try:
+                objname = cols[1].string.lower().strip().encode('ascii','ignore')
+            except AttributeError:
+                objname = cols[1].findChild().string.lower().strip().encode('ascii','ignore')
             for match in re.findall('[UuIi][VvRr]', objname ):
                 objname = objname.replace(match,'')
-            objname = objname.strip()
+            objname = objname.strip().replace(' ','_')
             for on in obsnums:
                 objects.append( [on, sidenum, groupnum, obstype, objname])
         elif obstype == 'arc':
@@ -353,7 +358,7 @@ def check_log( localfile=None, pagename=None, path_to_files=None ):
                 print 'Warning: %s%d.fits may not be an object! (group ::: %d)'%(pre, o[0], o[2])
                 print ' Log object name: %s ::: Fits file object name: %s' %(o[4], hdu.header['object'])
                 print
-            elif SequenceMatcher( a=o[4].lower(), b=hdu.header['object'].lower() ).ratio() < 0.5:
+            elif SequenceMatcher( a=o[4].lower().strip(), b=hdu.header['object'].lower().strip() ).ratio() < 0.5:
                 print 'Warning: %s%d.fits may not be the correct object!'%(pre, o[0])
                 print ' Log object name: %s ::: Fits file object name: %s' %(o[4], hdu.header['object'])
                 print
