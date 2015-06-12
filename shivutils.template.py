@@ -568,23 +568,34 @@ def id_arc(arc, side='b', coordlist=COORDLIST):
         order = 6
     elif side == 'b':
         order = 4
-    iraf.identify(arc, coordlist=coordlist, function="legendre", order=order,
-                  fwidth=5, cradius=5, )
+    while True:
+        iraf.identify(arc, coordlist=coordlist, function="legendre", order=order,
+                      fwidth=5, cradius=5)
+        inn = raw_input('\nTry again? [y/n] (n): ')
+        if 'y' not in inn.lower():
+            break
 
 ############################################################################
 
-def reid_arc(arc, reference, interact=True, coordlist=COORDLIST):
-
+def reid_arc(arc, reference, coordlist=COORDLIST):
     '''
     Construct wavelength solution from arc lamp,
      using previous extraction as a guide.
+    If any additional kwargs are given, they are passed onto iraf.reidentify().
+     For example, this is often useful:
+       override=ks.yes
+       (http://stsdas.stsci.edu/cgi-bin/gethelp.cgi?reidentify lists all options)
     '''
-    if interact:
-        interactive = yes
-    else:
-        interactive = no
-    iraf.reidentify(reference, arc, coordlist=coordlist, interactive=interactive,
-                    newaps=no, override=yes, refit=no, cradius=6, verbose=yes)
+    while True:
+        iraf.reidentify(reference, arc, coordlist=coordlist, interactive=yes, match=1,
+                        newaps=no, refit=no, cradius=6, verbose=yes)
+        inn = raw_input('\nTry again? [y/n] (n): ')
+        if 'y' not in inn.lower():
+            break
+        else:
+            # delete the associated database file
+            cmd = 'rm database/id%s' %( os.path.splitext(arc)[0] )
+            run_cmd( cmd, ignore_errors=True )
 
 ############################################################################
 

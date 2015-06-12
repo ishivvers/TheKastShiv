@@ -645,14 +645,18 @@ class Shiv(object):
             su.reid_arc( objarc, firstobjarc )
             self.log.info("ID'd "+objarc+" using "+firstobjarc+" as a reference")
 
-    def apply_wavelength(self):
+    def apply_wavelength(self, force=False):
         """
         Apply the relevant wavelength solution to each object.
+        If force==True, will delete previous file before applying solution.
         """
         self.log.info("Appying wavelength solution to all objects")
         bluearc = self.apf+self.ebroot%(self.barcs[0][0])
         for o in self.bobjects:
-            su.disp_correct( self.opf+self.ebroot%o[0], bluearc )
+            image = self.opf+self.ebroot%o[0]
+            if force:
+                su.run_cmd( 'rm d%s'%image, ignore_errors=True )
+            su.disp_correct( image, bluearc )
             self.log.info("Applied wavelength solution from "+bluearc+" to "+self.opf+self.ebroot%o[0])
 
         for o in self.robjects:
@@ -662,7 +666,10 @@ class Shiv(object):
                 redarc = redarcs[2]
             else:
                 redarc = redarcs[0]
-            su.disp_correct( self.opf+self.erroot%o[0], redarc )
+            image = self.opf+self.erroot%o[0]
+            if force:
+                su.run_cmd( 'rm d%s'%image, ignore_errors=True )
+            su.disp_correct( image, redarc )
             self.log.info("Applied wavelength solution from "+redarc+" to "+self.opf+self.erroot%o[0])
         self.opf = 'dcfb' # d for dispersion-corrected
 
