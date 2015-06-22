@@ -488,6 +488,8 @@ def reid_arc(arc, reference, coordlist=COORDLIST):
        (http://stsdas.stsci.edu/cgi-bin/gethelp.cgi?reidentify lists all options)
     '''
     while True:
+        print 'arc:',arc
+        print 'reference:',reference
         iraf.reidentify(reference, arc, coordlist=coordlist, interactive=yes, match=1,
                         newaps=no, refit=no, cradius=6, verbose=yes)
         inn = raw_input('\nTry again? [y/n] (n): ')

@@ -897,3 +897,9 @@ class Shiv(object):
         finals = glob( '*.flm' )
         for f in finals:
             su.plot_spectra( *np.loadtxt(f, unpack=True), title=f, savefile=f.strip('.flm')+'.png' )
+
+    def plt_flm(self, f):
+        """
+        Plot the flm file <f>.
+        """
+        su.plot_spectra( *np.loadtxt(f, unpack=True), title=f, savefile=f.strip('.flm')+'.png' )
