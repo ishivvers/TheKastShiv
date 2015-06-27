@@ -25,6 +25,8 @@ open('shivutils.py','w').write(s)
 # update the login.cl file
 s = open('tools/custom_cl/login.template.cl','r').read()
 s = s.replace('replace_me:home', homedir+'/tools/custom_cl/')
+inn = raw_input("What is the reducer's name?\n")
+s = s.replace('replace_me:name', inn)
 open('tools/custom_cl/login.cl','w').write(s)
 
 # update the kastfixhead file

@@ -32,6 +32,7 @@ procedure kastfixhead (images)
 			hedit(img,"UT",timeo,add+,del-,ver-,show+,upd+)
 
 		    hedit(img,"OBSERVAT","lick",add+,del-,ver-,show+,upd+)
+            hedit(img,"TELESCOP","shane",add+,del-,ver-,show+,upd+)
 	        hedit(img,"DISPAXIS",1,add+,del-,ver-,show+,upd+)
 	        asthedit(img,cmds_file,upd+,verbose+,oldstyl-)
 		    optpa(img)

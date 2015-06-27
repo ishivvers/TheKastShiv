@@ -7,7 +7,7 @@ if (defpar ("logver"))
 set	home		= "replace_me:home"
 set	imdir		= "HDR$"
 set	uparm		= "home$uparm/"
-set	userid		= "ishivvers"
+set	userid		= "replace_me:name"
 
 # Set the terminal type.
 if (envget("TERM") == "sun") {
