@@ -714,19 +714,20 @@ def clean_cosmics( fitspath, side, cleanpath=None, maskpath=None ):
         assert('/' not in fitspath)
         cleanpath = 'c' + fitspath
     # lacos parameters
-    objlim = 5.0
-    maxiter = 3
-    
     if side == 'red':
         gain = REDGAIN
         rdnoise = REDRDNOISE
         sigclip = 10.0
-        sigfrac = 2.0
+        sigfrac = 5.0
+        maxiter = 3
+        objlim = 3.0
     elif side == 'blue':
         gain = BLUEGAIN1
         rdnoise = BLUERDNOISE
-        sigclip = 4.5
-        sigfrac = 0.5
+        sigclip = 10.0
+        sigfrac = 5.0
+        maxiter = 3
+        objlim = 3.0
     
     array, header = cr.fromfits(fitspath)
     c = cr.cosmicsimage(array, gain=gain, readnoise=rdnoise,
