@@ -563,10 +563,15 @@ class Shiv(object):
          > S = Shiv()
          > ...
          > S.print_list( S.robjects )
-
+        
         A few quick examples:
         >> extract using a trace from another image:
          > S.extract_object_special( <side>, <iobject>, reference=<reference_image>, edit=S.yes, trace=S.no, fittrace=S.no )
+        >> extract using a different x location to define the aperture:
+         > S.extract_object_special( <side>, <iobject>, line=<line #> )
+        
+        All possible kwargs are listed on the IRAF page for apall:
+         http://stsdas.stsci.edu/cgi-bin/gethelp.cgi?apall.hlp
         """
         if side == 'red':
             o = self.robjects[iobject]
