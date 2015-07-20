@@ -134,6 +134,7 @@ def populate_working_dir( runID, logfile=None, all_obs=None ):
         else:
             fs.sort( key=lambda x: x[-1] )
             fname = fs[-1]
+            print 'Multiple versions of %s%d; using %s!' %(prefix[0],o[0], fname)
             run_cmd( 'cp %s %s%s%.3d.fits' %(fname,runID,prefix,o[0]))
     
     # change permissions
