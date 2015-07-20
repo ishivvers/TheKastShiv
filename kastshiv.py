@@ -421,11 +421,11 @@ class Shiv(object):
         self.log.info("Perfoming cosmic ray removal")
         blues = [self.opf+self.broot%o[0] for o in self.bobjects]
         for b in blues:
-            su.clean_cosmics( b, 'blue' )
+            su.clean_cosmics( b, 'blue', plot=self.interactive )
         self.log.info( '\nRemoved cosmic rays from the following files:\n'+',\n'.join(blues) )
         reds = [self.opf+self.rroot%o[0] for o in self.robjects]
         for r in reds:
-            su.clean_cosmics( r, 'red' )
+            su.clean_cosmics( r, 'red', plot=self.interactive )
         self.log.info( '\nRemoved cosmic rays from the following files:\n'+',\n'.join(reds) )
 
         self.opf = 'cfb'  # c for cosmic-ray removal

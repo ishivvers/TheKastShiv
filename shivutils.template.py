@@ -700,7 +700,7 @@ def extract( image, side, arc=False, interact=True, reference=None, trace_only=F
 # cosmic ray removal
 ############################################################################
 
-def clean_cosmics( fitspath, side, cleanpath=None, maskpath=None ):
+def clean_cosmics( fitspath, side, cleanpath=None, maskpath=None, plot=False ):
     """
      clean an input fits file using the LACOS algorithm 
     
@@ -718,16 +718,16 @@ def clean_cosmics( fitspath, side, cleanpath=None, maskpath=None ):
         gain = REDGAIN
         rdnoise = REDRDNOISE
         sigclip = 10.0
-        sigfrac = 5.0
+        sigfrac = 8.0
         maxiter = 3
-        objlim = 3.0
+        objlim = 2.0
     elif side == 'blue':
         gain = BLUEGAIN1
         rdnoise = BLUERDNOISE
-        sigclip = 10.0
-        sigfrac = 5.0
+        sigclip = 5.0
+        sigfrac = 3.0
         maxiter = 3
-        objlim = 3.0
+        objlim = 2.0
     
     array, header = cr.fromfits(fitspath)
     c = cr.cosmicsimage(array, gain=gain, readnoise=rdnoise,
@@ -736,7 +736,22 @@ def clean_cosmics( fitspath, side, cleanpath=None, maskpath=None ):
     cr.tofits(cleanpath, c.cleanarray, header)
     if maskpath != None:
         cr.tofits(maskpath, c.mask, header)
+    if plot:
+        fig,axs = plt.subplots( 3, 1, sharex=True )
+        axs[0].imshow( np.log10(c.rawarray).T )
+        axs[1].imshow( np.log10(c.rawarray-c.cleanarray).T )
+        axs[2].imshow( np.log10(c.cleanarray).T )
+        axs[0].set_title( 'Cosmic ray removal: %s'%fitspath )
+        axs[0].set_ylabel( 'input' )
+        axs[1].set_ylabel( 'CRs' )
+        axs[2].set_ylabel( 'cleaned' )
+        for ax in axs:
+            ax.set_yticks([])
+            ax.set_xticks([])
+        plt.tight_layout()
+        plt.show()
     return
+
 
 
 ######################################################################
