@@ -27,7 +27,7 @@ def get_all_logs( savefile=None ):
      values are lists of pages that indicate they were observed.
      Only registers properly-formatted pages.
     """
-    base = 'http://heracles.astro.berkeley.edu/doku.php?id='
+    base = 'http://heracles.astro.berkeley.edu/wiki/doku.php?id='
     main = 'start'
     archive = 'past_years_logs'
     creds = urllib.urlencode({"u" : wiki_un, "p" : wiki_pw})
@@ -86,7 +86,7 @@ def search_wiki_for( regexes, start=None, end=None ):
     """
     if type(regexes) != list:
         regexes = [regexes]
-    base = 'http://heracles.astro.berkeley.edu/doku.php?id='
+    base = 'http://heracles.astro.berkeley.edu/wiki/doku.php?id='
     main = 'start'
     archive = 'past_years_logs'
     creds = urllib.urlencode({"u" : wiki_un, "p" : wiki_pw})
@@ -146,7 +146,7 @@ def wiki2log( pagename, outfile=None ):
     creds = urllib.urlencode({"u" : wiki_un, "p" : wiki_pw})
 
     # open the Night Summary page for the run
-    soup = BeautifulSoup( urllib.urlopen("http://heracles.astro.berkeley.edu/doku.php?id="+pagename,creds) )
+    soup = BeautifulSoup( urllib.urlopen("http://heracles.astro.berkeley.edu/wiki/doku.php?id="+pagename,creds) )
 
     # make sure the table is there
     if soup.body.table == None:
