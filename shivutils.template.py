@@ -593,7 +593,7 @@ def extract( image, side, arc=False, interact=True, reference=None, trace_only=F
                  'b_function':'legendre',      # default background parameters
                  'b_order':2,
                  'b_sample':'-25:-10,10:25',
-                 'b_naver':-99,
+                 'b_naverage':-99,
                  'b_niterate':3,
                  'b_low_reject':3.0,
                  'b_high_reject':2.0,
