@@ -1042,19 +1042,26 @@ def join( spec1, spec2, scaleside=1, interactive=True ):
 
 ######################################################################
 
-def np2flm( fname, wl,fl, er=None, headerstring='' ):
+def np2flm( fname, wl,fl, er=None, blotch=None, headerstring='' ):
     """
     Saves numpy arrays of wavelength and flux into the 
      Flipper-standard ascii *.flm file.
+    If given a blotch vector (of booleans) will comment out the
+     blotched regions with an #
     """
+    if blotch == None:
+        blotch = np.zeros_like( wl )
     fout = open(fname, 'w')
     fout.write('# File created by shivutils (I.Shivvers)\n# ' +\
                headerstring + '\n# wl(A)   flm    er(optional)\n')
     for i,w in enumerate(wl):
         if er != None:
-            fout.write( '%.2f   %.8f   %.8f\n' %(w, fl[i], er[i]) )
+            l = '%.2f   %.8f   %.8f\n' %(w, fl[i], er[i])
         else:
-            fout.write( '%.2f   %.8f\n' %(w, fl[i]) )
+            l = '%.2f   %.8f\n' %(w, fl[i])
+        if blotch[i]:
+            l = '#'+l
+        fout.write( l )
     fout.close()
 
 ######################################################################
@@ -1165,3 +1172,30 @@ def plot_spectra(lam, flam, err=None, title=None, savefile=None):
         plt.savefig( savefile )
     
     plt.show()
+
+def blotch_spectrum( fname, outfname=None ):
+    '''
+    Interactively fix bad pixels and blotch out
+     bad regions, et cetera.
+
+    fname: path to *.flm file
+    outfname: path to savefile. If not given, overwrites original.
+    '''
+    if outfname == None:
+        outfname = fname
+
+    d = np.loadtxt( fname )
+    plot_spectra( d[:,0], d[:,1], title='Blotching' )
+    blotch = np.zeros_like( d[:,0] )
+    while True:
+        inn = raw_input('\nZoom around and hit enter to blotch a region , or "q" to quit.\n')
+        if 'q' in inn.lower():
+            break
+        print 'Click on the limits of the region to blotch out'
+        [x1,y1],[x2,y2] = plt.ginput(n=2, timeout=0)
+        xmin, xmax = min([x1,x2]), max([x1,x2])
+        m = (d[:,0] >= xmin) & (d[:,0] <= xmax)
+        blotch[m] = 1
+        plt.plot( d[:,0][m], d[:,1][m], 'r', lw=2 )
+        plt.draw()
+    np2flm(outfname, d[:,0], d[:,1], blotch=blotch, headerstring='Blotched regions marked with a #.')

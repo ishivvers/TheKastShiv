@@ -62,8 +62,7 @@ class Shiv(object):
                       self.id_arcs,
                       self.apply_wavelength,
                       self.flux_calibrate,
-                      self.coadd_join_output,
-                      self.plt_flams]
+                      self.coadd_join_output]
         self.current_step = 0
 
         self.extracted_images = [[],[]]  #[red,blue]; used to keep track of multiple observations of the same object
@@ -901,10 +900,16 @@ class Shiv(object):
         """
         finals = glob( '*.flm' )
         for f in finals:
-            su.plot_spectra( *np.loadtxt(f, unpack=True), title=f, savefile=f.strip('.flm')+'.png' )
+            su.plot_spectra( *np.loadtxt(f, unpack=True), title=f, savefile=f.replace('.flm', '.png') )
 
     def plt_flm(self, f):
         """
         Plot the flm file <f>.
         """
-        su.plot_spectra( *np.loadtxt(f, unpack=True), title=f, savefile=f.strip('.flm')+'.png' )
+        su.plot_spectra( *np.loadtxt(f, unpack=True), title=f, savefile=f.replace('.flm', '.png') )
+
+    def blotch_spectrum(self, f, outf=None):
+        """
+        Blotch out bad regions in flm file <f>, saving the result to outf.
+        """
+        su.blotch_spectrum(f, outf)
