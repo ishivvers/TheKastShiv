@@ -1068,6 +1068,7 @@ def np2flm( fname, wl,fl, er=None, blotch=None, headerstring='' ):
             l = '#'+l
         fout.write( l )
     fout.close()
+    print 'Saved to file',fname
 
 ######################################################################
 # automation tools
@@ -1199,16 +1200,17 @@ def blotch_spectrum( fname, outfname=None ):
             break
         elif 's' in inn.lower():
             np2flm(outfname, d[:,0], d[:,1], blotch=blotch)
-        elif 'u' in inn.lower():
+        elif 'r' in inn.lower():
             blotch = np.zeros_like( blotch )
             [l.remove() for l in blotchlines]
             blotchlines = []
+            plt.draw()
         else:
             print 'Click on the limits of the region to blotch out'
             [x1,y1],[x2,y2] = plt.ginput(n=2, timeout=0)
             xmin, xmax = min([x1,x2]), max([x1,x2])
             m = (d[:,0] >= xmin) & (d[:,0] <= xmax)
             blotch[m] = 1
-            blotchlines.append( plt.plot( d[:,0][m], d[:,1][m], 'r', lw=2 ) )
+            blotchlines.append( plt.plot( d[:,0][m], d[:,1][m], 'r', lw=2 )[0] )
             plt.draw()
     
