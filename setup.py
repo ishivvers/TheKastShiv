@@ -23,7 +23,7 @@ else:
 
 s = s.replace('replace_me:IDLPATH', idlpath)
 s = s.replace('replace_me:HOMEDIR', homedir)
-s = s.replace('replace_me:HOMEDIR', reducer)
+s = s.replace('replace_me:REDUCER', reducer)
 open('shivutils.py','w').write(s)
 
 # update the login.cl file

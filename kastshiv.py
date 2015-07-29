@@ -371,7 +371,7 @@ class Shiv(object):
         assert(self.opf == self.fpf == self.apf)
         files = [self.opf+self.broot%o[0] for o in self.bobjects+self.bflats+self.barcs] +\
                 [self.opf+self.rroot%o[0] for o in self.robjects+self.rflats+self.rarcs]
-        su.update_headers( files )
+        su.update_headers( files, reducer=su.REDUCER )
 
     def make_flats(self):
         """
