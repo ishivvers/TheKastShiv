@@ -68,7 +68,8 @@ BLUEPIXSCALE=0.43
 ## THIS PART FILLED IN BY SETUP.PY ##
 IDLPATH='replace_me:IDLPATH'
 HOMEDIR='replace_me:HOMEDIR'
-if ('replace_me' in IDLPATH) or ('replace_me' in HOMEDIR):
+REDUCER='replace_me:REDUCER'
+if ('replace_me' in IDLPATH) or ('replace_me' in HOMEDIR) or ('replace_me' in REDUCER):
     raise StandardError( 'Run setup.py before continuing!' )
 
 # location of various helpful files
@@ -390,13 +391,15 @@ def apply_flat(images, flat, prefix='f' ):
     
 ############################################################################
 
-def update_headers(images):
+def update_headers(images, reducer=None):
     """
     Run fixhead (custom IRAF task) and calculate the airmass values.
     """
     for image in images:
         iraf.kastfixhead(image)
         iraf.setairmass(image)
+        if reducer:
+            head_update(image, 'reducer', reducer)
 
 ############################################################################
 
@@ -1052,8 +1055,10 @@ def np2flm( fname, wl,fl, er=None, blotch=None, headerstring='' ):
     if blotch == None:
         blotch = np.zeros_like( wl )
     fout = open(fname, 'w')
-    fout.write('# File created by shivutils (I.Shivvers)\n# ' +\
-               headerstring + '\n# wl(A)   flm    er(optional)\n')
+    fout.write('# File created by shivutils (I.Shivvers)\n')
+    if np.any(blotch):
+        fout.write('# Blotched regions marked with a #.\n')
+    fout.write('# wl(A)   flm    er(optional)\n')
     for i,w in enumerate(wl):
         if er != None:
             l = '%.2f   %.8f   %.8f\n' %(w, fl[i], er[i])
@@ -1187,15 +1192,23 @@ def blotch_spectrum( fname, outfname=None ):
     d = np.loadtxt( fname )
     plot_spectra( d[:,0], d[:,1], title='Blotching' )
     blotch = np.zeros_like( d[:,0] )
+    blotchlines = []
     while True:
-        inn = raw_input('\nZoom around and hit enter to blotch a region , or "q" to quit.\n')
+        inn = raw_input('\nZoom around and hit enter to blotch a region , or "s" to save, "r" to restart, "q" to quit.\n')
         if 'q' in inn.lower():
             break
-        print 'Click on the limits of the region to blotch out'
-        [x1,y1],[x2,y2] = plt.ginput(n=2, timeout=0)
-        xmin, xmax = min([x1,x2]), max([x1,x2])
-        m = (d[:,0] >= xmin) & (d[:,0] <= xmax)
-        blotch[m] = 1
-        plt.plot( d[:,0][m], d[:,1][m], 'r', lw=2 )
-        plt.draw()
-    np2flm(outfname, d[:,0], d[:,1], blotch=blotch, headerstring='Blotched regions marked with a #.')
+        elif 's' in inn.lower():
+            np2flm(outfname, d[:,0], d[:,1], blotch=blotch)
+        elif 'u' in inn.lower():
+            blotch = np.zeros_like( blotch )
+            [l.remove() for l in blotchlines]
+            blotchlines = []
+        else:
+            print 'Click on the limits of the region to blotch out'
+            [x1,y1],[x2,y2] = plt.ginput(n=2, timeout=0)
+            xmin, xmax = min([x1,x2]), max([x1,x2])
+            m = (d[:,0] >= xmin) & (d[:,0] <= xmax)
+            blotch[m] = 1
+            blotchlines.append( plt.plot( d[:,0][m], d[:,1][m], 'r', lw=2 ) )
+            plt.draw()
+    
