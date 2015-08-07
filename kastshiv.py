@@ -865,11 +865,12 @@ class Shiv(object):
             wl,fl,er = su.coadd( files, fname=fname )
             self.log.info( 'Co-addition of %s saved to file %s'%(str(files), fname) )
 
-    def join(self, files=None, globstr=None, ftype='fits'):
+    def join(self, files=None, globstr=None, ftype='fits', outf=None):
         """
         Join red+blue sides of a set of files.  If given globstr, looks for red (ir) and
          blue (uv) versions with that globstring.  If given files (a list of [blue, red]),
          will simply join those. ftype can be one of ["fits" or "flm"].
+        If outf is given, will save file (in .flm ascii format) to that filename.
         """
         if 'globstr' != None:
             if ftype == 'fits':
@@ -882,7 +883,7 @@ class Shiv(object):
             blue = [f for f in allfiles if re.search('uv', f) ][0]
         else:
             blue, red = files
-        inn = raw_input('\n Join the following files? \n  UV: %s\n  IR: %s\n [y/n] (y):\n')
+        inn = raw_input('\n Join the following files? \n  UV: %s\n  IR: %s\n [y/n] (y):\n' %(str(blue), str(red)))
         if 'n' not in inn:
             if ftype == 'fits':
                 red = list(su.read_calfits( red ))
@@ -891,6 +892,9 @@ class Shiv(object):
                 red = np.loadtxt(red, unpack=True)
                 blue = np.loadtxt(blue, unpack=True)
             wl,fl,er = su.join( blue, red, interactive=self.interactive )
+        if outf != None:
+            su.np2flm( outf, wl,fl,er )
+        return wl,fl,er
 
     def plt_flams(self):
         """
