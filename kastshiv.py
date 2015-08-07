@@ -846,7 +846,6 @@ class Shiv(object):
             # only drop from the list if we got all the way through and successfully saved it
             allfiles = [f for f in allfiles if namedate not in f]
 
-
     def coadd(self, files=None, globstr=None):
         """
         Coadd a set of files.  If given globstr, will coadd all files
@@ -863,8 +862,7 @@ class Shiv(object):
             avg_time = np.mean( [float(re.search('\.\d{3}', fff).group()) for fff in files] )
             new_timestr = ('%.3f'%avg_time)[1:] #drop the leading 0
             fname = files[0].replace( f_timestr, new_timestr )
-            wl,fl,er = su.coadd( bluematches, fname=fname )
-            su.np2flm( fname, wl,fl,er )
+            wl,fl,er = su.coadd( files, fname=fname )
             self.log.info( 'Co-addition of %s saved to file %s'%(str(files), fname) )
 
     def join(self, files=None, globstr=None, ftype='fits'):
