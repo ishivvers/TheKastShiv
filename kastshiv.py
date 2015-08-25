@@ -872,7 +872,7 @@ class Shiv(object):
          will simply join those. ftype can be one of ["fits" or "flm"].
         If outf is given, will save file (in .flm ascii format) to that filename.
         """
-        if 'globstr' != None:
+        if globstr != None:
             if ftype == 'fits':
                 allfiles = glob('*'+globstr+'*.fits')
             elif ftype == 'flm':
