@@ -23,7 +23,7 @@ class Shiv(object):
      pipeline and the B.Cenko pipeline - thanks everyone).
     """
     
-    def __init__(self, runID, interactive=True, savefile=None, logfile=None,
+    def __init__(self, runID, interactive=False, savefile=None, logfile=None,
                  datePT=None, dateUT=None, inlog=None, pagename=None):
         self.runID = runID
         self.interactive = interactive
@@ -82,8 +82,8 @@ class Shiv(object):
     def skip(self):
         """Skip the current step and move on"""
         self.log.info('skipping '+self.steps[self.current_step].__name__)
-        self.current_step +=1
-        print 'next:',self.steps[self.current_step].__name__
+        self.go_to( self.current_step +1 )
+        self.summary()
 
     def go_to(self, step=None):
         """
@@ -440,7 +440,7 @@ class Shiv(object):
 
     def extract_object_spectra(self, side=['red','blue']):
         """
-        Extracts the spectra from each object.
+        Extracts the spectra from each object.  Cannot be run automatically.
         """
         self.log.info('Extracting spectra for red objects')
         # extract all red objects on the first pass
@@ -459,24 +459,23 @@ class Shiv(object):
                 else:
                     reference = self.extracted_images[0][irefs[0]]
 
-                # if we're interactive, give the user some choice here
-                if self.interactive:
-                    print '\nCurrent image:',fname
-                    inn = raw_input('\nView image with ds9? [y/n](n):\n')
-                    if 'y' in inn.lower():
-                        os.system('ds9 -scale log -geometry 1200x600 %s &' %fname)
-                    for iref in irefs:
-                        reference = self.extracted_images[0][iref]
-                        print
-                        print fname,':::',o[-1]
-                        print reference[0],':::',reference[1]
-                        inn = raw_input( '\nUse %s as a reference for %s?: [y/n](y)\n' %(reference[0], fname) )
-                        if 'n' not in inn.lower():
-                            break
-                        reference = None
+                # give the user some choice here
+                print '\nCurrent image:',fname
+                inn = raw_input('\nView image with ds9? [y/n](n):\n')
+                if 'y' in inn.lower():
+                    os.system('ds9 -scale log -geometry 1200x600 %s &' %fname)
+                for iref in irefs:
+                    reference = self.extracted_images[0][iref]
+                    print
+                    print fname,':::',o[-1]
+                    print reference[0],':::',reference[1]
+                    inn = raw_input( '\nUse %s as a reference for %s?: [y/n](y)\n' %(reference[0], fname) )
+                    if 'n' not in inn.lower():
+                        break
+                    reference = None
                 
                 if reference == None:
-                    su.extract( fname, 'red', interact=self.interactive )
+                    su.extract( fname, 'red', interact=True )
                     self.log.info('Extracted '+fname)
                 else:
                     su.extract( fname, 'red', reference=reference[0] )
@@ -506,48 +505,47 @@ class Shiv(object):
                 else:
                     reference = self.extracted_images[0][red_irefs[0]]
                 
-                # if we're interactive, give the user some choice here
-                if self.interactive:
-                    print '\nCurrent image:',fname
-                    inn = raw_input('\nView image with ds9? [y/n](n):\n')
-                    if 'y' in inn.lower():
-                        os.system('ds9 -scale log -geometry 1200x600 -zoom 0.6 %s &' %fname)
-                    blueref = False
-                    # choose from blue references first
-                    for iref in blue_irefs:
-                        reference = self.extracted_images[1][iref]
+                # give the user some choice here
+                print '\nCurrent image:',fname
+                inn = raw_input('\nView image with ds9? [y/n](n):\n')
+                if 'y' in inn.lower():
+                    os.system('ds9 -scale log -geometry 1200x600 -zoom 0.6 %s &' %fname)
+                blueref = False
+                # choose from blue references first
+                for iref in blue_irefs:
+                    reference = self.extracted_images[1][iref]
+                    print
+                    print fname,':::',o[-1]
+                    print reference[0],':::',reference[1]
+                    inn = raw_input( 'Use %s as a reference for %s? [y/n](y)\n' %(reference[0], fname) )
+                    if 'n' not in inn.lower():
+                        blueref = True
+                        break
+                    reference = None
+                if not blueref:
+                    # next try the reds
+                    for iref in red_irefs:
+                        reference = self.extracted_images[0][iref]
                         print
                         print fname,':::',o[-1]
-                        print reference[0],':::',reference[1]
+                        print reference[0],' :::',reference[1]
                         inn = raw_input( 'Use %s as a reference for %s? [y/n](y)\n' %(reference[0], fname) )
                         if 'n' not in inn.lower():
-                            blueref = True
                             break
                         reference = None
-                    if not blueref:
-                        # next try the reds
-                        for iref in red_irefs:
-                            reference = self.extracted_images[0][iref]
-                            print
-                            print fname,':::',o[-1]
-                            print reference[0],' :::',reference[1]
-                            inn = raw_input( 'Use %s as a reference for %s? [y/n](y)\n' %(reference[0], fname) )
-                            if 'n' not in inn.lower():
-                                break
-                            reference = None
 
                 if reference == None:
                     su.extract( fname, 'blue', interact=self.interactive )
                 else:
                     if blueref:
                         # go ahead and simply use as a reference
-                        su.extract( fname, 'blue', reference=reference[0], interact=self.interactive )
+                        su.extract( fname, 'blue', reference=reference[0], interact=True )
                         self.log.info('Used ' + reference[0] + ' for reference on '+ fname +' (objects: '+reference[1]+' ::: '+o[4]+')')
                     else:
                         # Need to pass along apfile and conversion factor to map the red extraction
                         #  onto this blue image. Blue CCD has a plate scale 1.8558 times larger than the red.
                         apfile = 'database/ap'+reference[0].strip('.fits')
-                        su.extract( fname, 'blue', apfile=apfile, interact=self.interactive )
+                        su.extract( fname, 'blue', apfile=apfile, interact=True )
                         self.log.info('Used apfiles from ' + reference[0] + ' for reference on '+ fname +' (objects: '+reference[1]+' ::: '+o[4]+')')
 
                 self.extracted_images[1].append( [fname,o[4]] )
@@ -581,7 +579,7 @@ class Shiv(object):
         else:
             raise StandardError('Side must be one of "red", "blue"')
 
-        su.extract( fname, side, interact=self.interactive, **kwargs )
+        su.extract( fname, side, interact=True, **kwargs )
         if (side == 'red') and (fname not in [extracted[0] for extracted in self.extracted_images[0]]):
             self.extracted_images[0].append( [fname,o[4]] )
         if (side == 'blue') and (fname not in [extracted[0] for extracted in self.extracted_images[1]]):
@@ -617,7 +615,8 @@ class Shiv(object):
 
     def id_arcs(self):
         """
-        Go through and identify and fit for the lines in all arc files.
+        Go through and identify and fit for the lines in all arc files. Requires
+         human interaction.
         """
         self.log.info("Identifying arc lines and fitting for wavelength solutions")
         # ID the blue side arc
@@ -679,7 +678,8 @@ class Shiv(object):
 
     def flux_calibrate(self, side=None):
         """
-        Determine and apply the relevant flux calibration to all objects.
+        Determine and apply the relevant flux calibration to all objects. Requires
+         human interaction.
         """
         # keep track of the files we create here, and move them to ../final
         starting_files = glob('*.fits')
@@ -723,7 +723,7 @@ class Shiv(object):
          joins the red and blue sides of each observation, and then saves
          the result as an ASCII (.flm) file.
         If globstr is given, only processes files that include that glob string (example: glob='sn2014ds').
-        This task must be run interactively.
+        Requires human interaction.
         """
         if globstr != '':
             globstr = '*'+globstr
