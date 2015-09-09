@@ -864,6 +864,7 @@ class Shiv(object):
             fname = files[0].replace( f_timestr, new_timestr )
             wl,fl,er = su.coadd( files, fname=fname )
             self.log.info( 'Co-addition of %s saved to file %s'%(str(files), fname) )
+            return wl,fl,er
 
     def join(self, files=None, globstr=None, ftype='fits', outf=None):
         """
