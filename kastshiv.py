@@ -442,6 +442,7 @@ class Shiv(object):
         """
         Extracts the spectra from each object.  Cannot be run automatically.
         """
+        self.interactive = True
         self.log.info('Extracting spectra for red objects')
         # extract all red objects on the first pass
         if 'red' in side:
