@@ -729,15 +729,22 @@ class Shiv(object):
         if globstr != '':
             globstr = '*'+globstr
         allfiles = glob(globstr+'*[(uv)(ir)].ms.fits')
+        toremove = []
         # ignore fitsfiles for which there exists a *.flm file
         allflms = glob('*.flm')
         for f in allflms:
-            objname = f.split('-')[0]
+            datestr = re.search('\d{8}', f).group()
+            objname = f.split(datestr)[0].strip('-')
+            print
+            print objname
             for ff in allfiles:
-                if re.search( objname, ff ):
+                if objname in ff:
                     print ff,'already run. Ignoring.'
-                    allfiles.remove( ff )
-        
+                    print '(To re-run, delete flm file and try again.)'
+                    toremove.append(ff)
+        for ff in toremove:
+            allfiles.remove( ff )
+
         while True:
             ## choose the file to do
             print '\nFiles remaining to process:'
