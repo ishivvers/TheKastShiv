@@ -667,7 +667,7 @@ def extract( image, side, arc=False, interact=True, reference=None, trace_only=F
             ap_params['references'] = reference
             ap_params['recenter']   = no
             ap_params['edit']       = no
-            ap_params['fittrace']   = no
+            ap_params['fittrace']   = yes
 
     elif arc:
         print 'Extracting arc.'
