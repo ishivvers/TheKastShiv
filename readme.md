@@ -54,5 +54,8 @@ and the flipperwiki.  For example:
 
 ### to do ###
 
-Fix windowing error in IDL code during telluric correction
- (adjusting window size fails).
+ - should average ~50 columns for the trim section definition, to smooth it out better
+ - stop doing cosmic ray removal on the blue side
+ - do a better job with seeing calculations? Calculate if possible from observation.
+ - put all of the lists into dictionaries that allow user to add/remove entries at will
+ - track file names per image with a dictionary?
