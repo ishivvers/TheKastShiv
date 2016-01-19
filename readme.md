@@ -54,8 +54,5 @@ and the flipperwiki.  For example:
 
 ### to do ###
 
- - should average ~50 columns for the trim section definition, to smooth it out better
- - stop doing cosmic ray removal on the blue side
  - do a better job with seeing calculations? Calculate if possible from observation.
- - put all of the lists into dictionaries that allow user to add/remove entries at will
- - track file names per image with a dictionary?
+ - put all of the lists into dictionaries that allow user to add/remove entries more easily.
