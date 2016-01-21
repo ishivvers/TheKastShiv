@@ -250,7 +250,7 @@ def head_del( images, keywords ):
         hdu = pf.open(image)
         for key in keywords:
             hdu[0].remove(key)
-        hdu.writeto( image, clobber=True )
+        hdu.writeto( image, clobber=True, output_verify='warn' )
         hdu.close()
 
 ############################################################################
@@ -271,7 +271,7 @@ def head_update( images, keywords, values, comment=None ):
         hdu = pf.open(image)
         for i,key in enumerate(keywords):
             hdu[0].header.set(key, values[i], comment)
-        hdu.writeto( image, clobber=True )
+        hdu.writeto( image, clobber=True, output_verify='warn' )
         hdu.close()
 
 ############################################################################
@@ -334,7 +334,7 @@ def bias_correct(images, y1, y2, prefix=None):
             pass
         
         # write to file
-        pf.writeto( prefix+image, corrected_data, fits.header )
+        pf.writeto( prefix+image, corrected_data, fits.header, output_verify='warn' )
 
 ############################################################################
 
@@ -987,7 +987,7 @@ def coadd( files, save=True, fname=None ):
         # update data
         hdu.data = np.vstack( (fl, er) )
         # save the file
-        hdu.writeto( fname )
+        hdu.writeto( fname, output_verify='warn' )
     return wl, fl, er
 
 ######################################################################
