@@ -649,7 +649,7 @@ class Shiv(object):
             su.reid_arc( objarc, firstobjarc )
             self.log.info("ID'd "+objarc+" using "+firstobjarc+" as a reference")
 
-    def apply_wavelength(self, force=False):
+    def apply_wavelength(self, force=True):
         """
         Apply the relevant wavelength solution to each object.
         If force==True, will delete previous file before applying solution.

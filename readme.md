@@ -54,5 +54,5 @@ and the flipperwiki.  For example:
 
 ### to do ###
 
-Fix windowing error in IDL code during telluric correction
- (adjusting window size fails).
+ - do a better job with seeing calculations? Calculate if possible from observation.
+ - put all of the lists into dictionaries that allow user to add/remove entries more easily.
