@@ -311,7 +311,7 @@ def check_log( localfile=None, pagename=None, path_to_files=None ):
     bluemismatch = [o for o in objects if (o[1] == 1 and o[2] != 1)]
     if bluemismatch:
         raise Exception( 'The following objects are listed as side 1, but not group 1:\n' +\
-                         '\n'.join( [' blue %d' %o[1] for o in bluemismatch] ) )
+                         '\n'.join( [' blue %d' %o[0] for o in bluemismatch] ) )
 
     if path_to_files != None:
         # go through each file and assert that it exists and is the type it's supposed to be
