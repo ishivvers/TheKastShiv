@@ -804,7 +804,7 @@ def match_science_and_standards( allobjects ):
     airmasses = []
     std_names = []
     for fname in allobjects:
-        if 'blue' not in fname:
+        if not re.search('blue\d{3}', fname):
             continue
         objname = head_get( fname, 'OBJECT' )[0]
         std_id = id_standard( objname )
@@ -821,7 +821,7 @@ def match_science_and_standards( allobjects ):
     airmasses = np.array(airmasses)
     # now associate each blue science obs with a standard
     for fname in allobjects:
-        if 'blue' not in fname:
+        if not re.search('blue\d{3}', fname):
             continue
         objname = head_get( fname, 'OBJECT' )[0]
         std_id = id_standard( objname )
@@ -835,7 +835,7 @@ def match_science_and_standards( allobjects ):
     airmasses = []
     std_names = []
     for fname in allobjects:
-        if 'red' not in fname:
+        if not re.search('red\d{3}', fname):
             continue
         objname = head_get( fname, 'OBJECT' )[0]
         std_id = id_standard( objname )
@@ -852,7 +852,7 @@ def match_science_and_standards( allobjects ):
     airmasses = np.array(airmasses)
     # now associate each red science obs with a standard
     for fname in allobjects:
-        if 'red' not in fname:
+        if not re.search('red\d{3}', fname):
             continue
         objname = head_get( fname, 'OBJECT' )[0]
         std_id = id_standard( objname )
