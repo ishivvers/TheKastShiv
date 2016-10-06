@@ -315,18 +315,22 @@ def overscan_bias_correct(images, prefix=None):
     for image in images:
         overscan_bias( [image], [prefix+image] )
 
-def trim(images, y1, y2, prefix=None):
-    """
-    Maybe needs testing after new bias?
-
-    """
+def trim(images, y1=None, y2=None, x1=None, x2=None, prefix=None):
     if prefix == None:
         prefix = 't'
 
     for image in images:
-        # open file and trim it
+        # if values aren't given, assume no trim
         fits = pf.open( image )[0]
-        trimmed_data = fits.data[y1:y2, :]
+        if y1 == None:
+            y1 = 0
+        if y2 == None:
+            y2 = fits.data.shape[0]
+        if x1 == None:
+            x1 = 0
+        if x2 == None:
+            x2 = fits.data.shape[1]
+        trimmed_data = fits.data[y1:y2, x1:x2]
         
         # remove the DATASEC keyheader keyword if it exists
         try:

@@ -3,14 +3,6 @@ The Kast Shiv: a Kast spectrocscopic reduction pipeline
  written by I.Shivvers (modified from the K.Clubb/J.Silverman/R.Foley/R.Chornock/T.Matheson
  pipeline and the B.Cenko pipeline - thanks everyone).
 
-Shiv To-Do:
-
-+ is kast bias workable?  I think I see bias inconsistencies
-   across the 2 amps after using python script.
-
-+ Need to handle crazy noise at extreme ends of
-   red CCD; that leads to failure when xcorrelating
-   the sky wl shift
 
 """
 
@@ -55,6 +47,8 @@ class Shiv(object):
             self.savefile = os.path.abspath('.') + '/' + self.runID + '.sav'
         else:
             self.savefile = savefile
+        if PARALLEL:
+            self.parallel = True
 
         # set up the logfile
         if logfile == None:
@@ -148,7 +142,7 @@ class Shiv(object):
         elif self.steps.index( self.apply_wavelength ) < self.current_step:
             # have performed bias correction, cosmic ray removal, trimmed, flatfields,
             #  and performed a dispersion correction
-            self.opf = 'dftb'
+            self.opf = 'dftcb'
             self.apf = 'ftb'
             self.fpf = 'tb'
 
@@ -375,16 +369,16 @@ class Shiv(object):
         Performs cosmic ray rejection on all objects.
         """
         blues = [self.opf+self.broot%o[0] for o in self.bobjects]
-        if PARALLEL:
-            f = lambda b: su.clean_cosmics( b, 'blue', plot=self.interactive )
+        if self.parallel:
+            f = lambda b: su.clean_cosmics( b, 'blue', plot=False )
             pool = multiprocessing.ProcessingPool()
             pool.map( f, blues )
         else:
             for b in blues:
-                su.clean_cosmics( b, 'blue', plot=self.interactive )
+                su.clean_cosmics( b, 'blue', plot=False )
 
         reds = [self.opf+self.rroot%o[0] for o in self.robjects]
-        if PARALLEL:
+        if self.parallel:
             f = lambda r: su.clean_cosmics( r, 'red', plot=self.interactive )
             pool = multiprocessing.ProcessingPool()
             pool.map( f, reds )
@@ -428,15 +422,15 @@ class Shiv(object):
         blues = [self.opf+self.broot%o[0] for o in self.bobjects] +\
                [self.apf+self.broot%o[0] for o in self.barcs] +\
                [self.fpf+self.broot%o[0] for o in self.bflats]
-        su.trim( blues, self.r_ytrim[0], self.r_ytrim[1] )
+        su.trim( blues, y1=self.r_ytrim[0], y2=self.r_ytrim[1] )
 
         reds = [self.opf+self.rroot%o[0] for o in self.robjects] +\
                [self.apf+self.rroot%o[0] for o in self.rarcs] +\
                [self.fpf+self.rroot%o[0] for o in self.rflats]
-        su.trim( reds, self.r_ytrim[0], self.r_ytrim[1] )
+        su.trim( reds, y1=self.r_ytrim[0], y2=self.r_ytrim[1] )
 
-        self.log.info( '\nApplied trim section (%.4f, %.4f) to following files:\n'%(self.b_ytrim[0], self.b_ytrim[1])+','.join(blues) )
-        self.log.info( '\nApplied trim section (%.4f, %.4f) to following files:\n'%(self.r_ytrim[0], self.r_ytrim[1])+','.join(reds) )
+        self.log.info( '\nApplied y trim section (%.4f, %.4f) to following files:\n'%(self.b_ytrim[0], self.b_ytrim[1])+','.join(blues) )
+        self.log.info( '\nApplied y trim section (%.4f, %.4f) to following files:\n'%(self.r_ytrim[0], self.r_ytrim[1])+','.join(reds) )
         self.opf = 'tcb'# t for bias-subtracted
         self.apf = 'tb' 
         self.fpf = 'tb'
