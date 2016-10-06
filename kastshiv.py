@@ -2,6 +2,16 @@
 The Kast Shiv: a Kast spectrocscopic reduction pipeline
  written by I.Shivvers (modified from the K.Clubb/J.Silverman/R.Foley/R.Chornock/T.Matheson
  pipeline and the B.Cenko pipeline - thanks everyone).
+
+Shiv To-Do:
+
++ is kast bias workable?  I think I see bias inconsistencies
+   across the 2 amps after using python script.
+
++ Need to handle crazy noise at extreme ends of
+   red CCD; that leads to failure when xcorrelating
+   the sky wl shift
+
 """
 
 import shivutils as su
@@ -14,6 +24,13 @@ import pickle
 from tools import check_log
 from glob import glob
 from copy import copy
+try:
+    from pathos import multiprocessing
+    PARALLEL = True
+except ImportError as e:
+    print 'ERROR:',e
+    print 'Multi-core usage not available.'
+    PARALLEL = False
 import numpy as np
 
 class Shiv(object):
@@ -50,12 +67,14 @@ class Shiv(object):
                       self.get_data,
                       self.move_data,
                       self.define_lists,
-                      self.find_trim_sections,
-                      self.trim_and_bias_correct,
+                      self.bias_correct,  
+                      self.reject_cosmic_rays,
+                      self.rotate_red, 
+                      self.find_trim_sections, 
+                      self.trim, 
                       self.update_headers,
                       self.make_flats,
                       self.apply_flats,
-                      self.reject_cosmic_rays,
                       self.calc_seeing,
                       self.extract_object_spectra,
                       self.extract_arc_spectra,
@@ -101,31 +120,37 @@ class Shiv(object):
             self.current_step = int(raw_input())
             self.summary()
         # handle the prefixes properly
-        if self.current_step <= self.steps.index( self.trim_and_bias_correct ):
+        if self.current_step <= self.steps.index( self.bias_correct ):
             # have not yet changed any prefixes
             self.opf = ''
             self.apf = ''
             self.fpf = ''
-        elif self.steps.index( self.trim_and_bias_correct ) < self.current_step <= self.steps.index( self.apply_flats ):
+        elif self.steps.index( self.bias_correct ) < self.current_step <= self.steps.index( self.reject_cosmic_rays ):
             # have performed bias correction
             self.opf = 'b'
             self.apf = 'b'
             self.fpf = 'b'
-        elif self.steps.index( self.apply_flats ) < self.current_step <= self.steps.index( self.reject_cosmic_rays ):
-            # have performed bias correction and flatfielding
-            self.opf = 'fb'
-            self.apf = 'fb'
+        elif self.steps.index( self.reject_cosmic_rays ) < self.current_step <= self.steps.index( self.trim ):
+            # have performed bias correction and and cosmic ray removal
+            self.opf = 'cb'
+            self.apf = 'b'
             self.fpf = 'b'
-        elif self.steps.index( self.reject_cosmic_rays ) < self.current_step <= self.steps.index( self.apply_wavelength ):
-            # have performed bias correction, flatfielding, and cosmic ray removal
-            self.opf = 'cfb'
-            self.apf = 'fb'
-            self.fpf = 'b'
+        elif self.steps.index( self.trim ) < self.current_step <= self.steps.index( self.apply_flats ):
+            # have performed bias correction, and cosmic ray removal, and trimmed
+            self.opf = 'tcb'
+            self.apf = 'tb'
+            self.fpf = 'tb'
+        elif self.steps.index( self.apply_flats ) < self.current_step <= self.steps.index( self.apply_wavelength ):
+            # have performed bias correction, cosmic ray removal, trimmed, and flatfields
+            self.opf = 'ftcb'
+            self.apf = 'ftb'
+            self.fpf = 'tb'
         elif self.steps.index( self.apply_wavelength ) < self.current_step:
-            # have performed bias correction, flatfielding, and cosmic ray removal, and performed a dispersion correction
-            self.opf = 'dcfb'
-            self.apf = 'fb'
-            self.fpf = 'b'
+            # have performed bias correction, cosmic ray removal, trimmed, flatfields,
+            #  and performed a dispersion correction
+            self.opf = 'dftb'
+            self.apf = 'ftb'
+            self.fpf = 'tb'
 
     def save(self):
         """
@@ -231,12 +256,12 @@ class Shiv(object):
         if logfile:
             self.objects, self.arcs, self.flats = su.wiki2elog( runID=self.runID, infile=logfile )
         # re-define the file lists
-        self.robjects = [o for o in self.objects if o[1]==2]
-        self.bobjects = [o for o in self.objects if o[1]==1]
-        self.rflats = [f for f in self.flats if f[1]==2]
-        self.bflats = [f for f in self.flats if f[1]==1]
-        self.rarcs = [a for a in self.arcs if a[1]==2]
-        self.barcs = [a for a in self.arcs if a[1]==1]
+        self.robjects = [o for o in self.objects if o[1]=='r']
+        self.bobjects = [o for o in self.objects if o[1]=='b']
+        self.rflats = [f for f in self.flats if f[1]=='r']
+        self.bflats = [f for f in self.flats if f[1]=='b']
+        self.rarcs = [a for a in self.arcs if a[1]=='r']
+        self.barcs = [a for a in self.arcs if a[1]=='b']
 
     def print_list(self, lll):
         """
@@ -256,9 +281,9 @@ class Shiv(object):
         """
         Create the file system hierarchy and enter it.
         """
-        self.log.info('Creating file system for run %s'%self.runID)
         su.make_file_system( self.runID )
         print 'Moving into %s directory'%self.runID
+        self.log.info('Created file system for run %s'%self.runID)
         os.chdir( self.runID )
 
     def get_data(self, datePT=None, creds=None):
@@ -271,13 +296,13 @@ class Shiv(object):
         if datePT == None:
             datePT = self.datePT
         print 'Moving into rawdata directory.'
-        self.log.info('Downloading data for %s'%datePT)
         os.chdir( 'rawdata' )
         if creds == None:
             su.get_kast_data( datePT )
         else:
             su.get_kast_data( datePT, un=creds[0], pw=creds[1] )
         print 'Moving into working directory'
+        self.log.info('Downloaded data for %s'%datePT)
         os.chdir( '../working' )
 
     def move_data(self, dateUT=None, logfile=None, pagename=None):
@@ -299,17 +324,15 @@ class Shiv(object):
             if not pagename:
                 date = date_parser.parse(datestring)
                 pagename = "%d_%.2d_kast_%s" %(date.month, date.day, self.runID)
-            print 'Running log check...'
-            check_log.check_log( pagename=pagename, path_to_files='../rawdata/' )
             self.objects, self.arcs, self.flats = su.wiki2elog( datestring=dateUT, runID=self.runID, outfile='%s.log'%self.runID, pagename=pagename  )
-            su.populate_working_dir( self.runID, logfile='%s.log'%self.runID )
+            logfile = '%s.log'%self.runID
+            su.populate_working_dir( self.runID, logfile=logfile )
         elif logfile != None:
-            print 'Running log check...'
-            check_log.check_log( localfile=logfile, path_to_files='../rawdata/' )
             self.objects, self.arcs, self.flats = su.wiki2elog( datestring=dateUT, runID=self.runID, infile=logfile )
             su.populate_working_dir( self.runID, logfile=logfile )
         else:
             raise StandardError( 'Improper arguments! Need one of logfile or dateUT' )
+        self.log.info( 'Moved data into working directory; using logfile=%s'%logfile )
 
     def define_lists(self, logfile=None):
         """
@@ -318,7 +341,6 @@ class Shiv(object):
         If given a logfile path, will use that logfile to build the lists (useful when
             restarting an aborted run.)
         """
-        self.log.info('Populating file lists from log')
         # define the file lists
         self.build_lists( logfile=logfile )
 
@@ -331,12 +353,67 @@ class Shiv(object):
         self.opf = ''  # object
         self.apf = ''  # arc
         self.fpf = ''  # flat
+        self.log.info('Populated file lists from log')
+
+    def bias_correct(self):
+        """
+        Bias corrects images.
+        """
+        blues = [self.opf+self.broot%o[0] for o in self.bobjects+self.bflats+self.barcs]
+        su.overscan_bias_correct( blues )
+
+        reds = [self.opf+self.rroot%o[0] for o in self.robjects+self.rflats+self.rarcs]
+        su.overscan_bias_correct( reds )
+        
+        self.log.info( 'Bias corrected the following files:\n'+','.join(blues+reds) )
+        self.opf = 'b'# b for bias-subtracted
+        self.apf = 'b' 
+        self.fpf = 'b'
+
+    def reject_cosmic_rays(self):
+        """
+        Performs cosmic ray rejection on all objects.
+        """
+        blues = [self.opf+self.broot%o[0] for o in self.bobjects]
+        if PARALLEL:
+            f = lambda b: su.clean_cosmics( b, 'blue', plot=self.interactive )
+            pool = multiprocessing.ProcessingPool()
+            pool.map( f, blues )
+        else:
+            for b in blues:
+                su.clean_cosmics( b, 'blue', plot=self.interactive )
+
+        reds = [self.opf+self.rroot%o[0] for o in self.robjects]
+        if PARALLEL:
+            f = lambda r: su.clean_cosmics( r, 'red', plot=self.interactive )
+            pool = multiprocessing.ProcessingPool()
+            pool.map( f, reds )
+        else:
+            for r in reds:
+                su.clean_cosmics( r, 'red', plot=self.interactive )
+        
+        self.log.info( 'Removed cosmic rays from the following files:\n'+','.join(blues+reds) )
+        self.opf = 'cb'  # c for cosmic-ray removal
+
+    def rotate_red(self, angle=1.0):
+        """
+        Rotates the red CCD to fix slit orientation, and
+         then tranposes the x,y axes to get it aligned as normal (blue to the left).
+        """
+        reds = [self.opf+self.rroot%o[0] for o in self.robjects] +\
+               [self.apf+self.rroot%o[0] for o in self.rarcs] +\
+               [self.fpf+self.rroot%o[0] for o in self.rflats]
+        
+        su.rotate( reds, angle )
+        self.log.info('Rotated following images by {}:\n'.format(angle)+','.join(reds))
+        
+        su.transpose( reds )
+        self.log.info('Transposed X,Y for following images:\n'+','.join(reds))
 
     def find_trim_sections(self):
         """
         Determine the optimal trim sections for each side.
         """
-        self.log.info('Fitting for optimal trim sections')
         # find the trim sections for the red and blue images,
         #  using the first red and blue flats
         self.b_ytrim = su.find_trim_sec( self.apf+self.broot%self.bflats[0][0], plot=self.interactive )
@@ -344,106 +421,85 @@ class Shiv(object):
         self.log.info( '\nBlue trim section: (%.4f, %.4f) \nRed trim section: (%.4f, %.4f)'%(self.b_ytrim[0],
                                                            self.b_ytrim[1], self.r_ytrim[0], self.r_ytrim[0]) )
 
-    def trim_and_bias_correct(self):
+    def trim(self):
         """
-        Trims and bias corrects images.
+        Trims images.
         """
-        self.log.info('Trimming and bias correcting all images')
-        assert(self.opf == self.fpf == self.apf)
-        blues = [self.opf+self.broot%o[0] for o in self.bobjects+self.bflats+self.barcs]
-        su.bias_correct( blues, self.b_ytrim[0], self.b_ytrim[1] )
+        blues = [self.opf+self.broot%o[0] for o in self.bobjects] +\
+               [self.apf+self.broot%o[0] for o in self.barcs] +\
+               [self.fpf+self.broot%o[0] for o in self.bflats]
+        su.trim( blues, self.r_ytrim[0], self.r_ytrim[1] )
 
-        reds = [self.opf+self.rroot%o[0] for o in self.robjects+self.rflats+self.rarcs]
-        su.bias_correct( reds, self.r_ytrim[0], self.r_ytrim[1] )
+        reds = [self.opf+self.rroot%o[0] for o in self.robjects] +\
+               [self.apf+self.rroot%o[0] for o in self.rarcs] +\
+               [self.fpf+self.rroot%o[0] for o in self.rflats]
+        su.trim( reds, self.r_ytrim[0], self.r_ytrim[1] )
 
-        self.log.info( '\nApplied trim section (%.4f, %.4f) to following files:\n'%(self.b_ytrim[0], self.b_ytrim[1])+',\n'.join(blues) )
-        self.log.info( '\nApplied trim section (%.4f, %.4f) to following files:\n'%(self.r_ytrim[0], self.r_ytrim[1])+',\n'.join(reds) )
-        self.opf = 'b'# b for bias-subtracted
-        self.apf = 'b' 
-        self.fpf = 'b'
+        self.log.info( '\nApplied trim section (%.4f, %.4f) to following files:\n'%(self.b_ytrim[0], self.b_ytrim[1])+','.join(blues) )
+        self.log.info( '\nApplied trim section (%.4f, %.4f) to following files:\n'%(self.r_ytrim[0], self.r_ytrim[1])+','.join(reds) )
+        self.opf = 'tcb'# t for bias-subtracted
+        self.apf = 'tb' 
+        self.fpf = 'tb'
 
     def update_headers(self):
         """
         Inserts the airmass and optimal PA into the headers for
          each image, along with other header fixes.
         """
-        self.log.info('Updating headers of all images')
-        assert(self.opf == self.fpf == self.apf)
-        files = [self.opf+self.broot%o[0] for o in self.bobjects+self.bflats+self.barcs] +\
-                [self.opf+self.rroot%o[0] for o in self.robjects+self.rflats+self.rarcs]
-        su.update_headers( files, reducer=su.REDUCER )
+        blues = [self.opf+self.broot%o[0] for o in self.bobjects] +\
+               [self.apf+self.broot%o[0] for o in self.barcs] +\
+               [self.fpf+self.broot%o[0] for o in self.bflats]
+        reds = [self.opf+self.rroot%o[0] for o in self.robjects] +\
+               [self.apf+self.rroot%o[0] for o in self.rarcs] +\
+               [self.fpf+self.rroot%o[0] for o in self.rflats]
+        su.update_headers( blues+reds, reducer=su.REDUCER )
+        self.log.info('Updated headers of all images')
 
-    def make_flats(self):
+    def make_flats(self, bflat='bflat', rflat='rflat'):
         """
         Makes combined and normalized flats for each side.
         """
-        self.log.info('Creating flats')
         blues = [self.fpf+self.broot%o[0] for o in self.bflats]
-        su.make_flat( blues, 'nflat1', 'blue', interactive=self.interactive )
-        self.log.info( '\nCreated flat nflat1 out of the following files:\n'+',\n'.join(blues) )
+        su.make_flat( blues, bflat, 'blue', interactive=self.interactive )
+        self.bflat = bflat
+        self.log.info( '\nCreated flat image {}.fits out of the following files:\n'.format(bflat)+','.join(blues) )
 
-        # go through and make the combined and normalized red flats for each object
-        allgroups = set([o[2] for o in self.objects])
-        allgroups.remove(1)    # skip the blues
-        for i in allgroups:
-            reds = [self.fpf+self.rroot%o[0] for o in self.rflats if o[2]==i]
-            if len(reds) != 0:
-                su.make_flat( reds, 'nflat%d'%i, 'red', interactive=self.interactive )
-                self.log.info( '\nCreated flat nflat%d out of the following files:\n'%i+',\n'.join(reds) )
+        reds = [self.fpf+self.rroot%o[0] for o in self.rflats]
+        su.make_flat( reds, rflat, 'red', interactive=self.interactive )
+        self.rflat = rflat
+        self.log.info( '\nCreated flat image {}.fits out of the following files:\n'.format(rflat)+','.join(reds) )
 
     def apply_flats(self):
         """
         Applies flatfields to each side.
         """
-        self.log.info('Applying flatfield correction to all images')
-        assert(self.opf == self.apf)
-        blues = [self.opf+self.broot%o[0] for o in self.bobjects+self.barcs]
-        su.apply_flat( blues, 'nflat1' )
-        self.log.info( '\nApplied flat nflat1 to the following files:\n'+',\n'.join(blues) )
+        blues = [self.opf+self.broot%o[0] for o in self.bobjects] +\
+                [self.apf+self.broot%o[0] for o in self.barcs]
+        su.apply_flat( blues, self.bflat )
+        self.log.info( '\nApplied flat {} to the following files:\n'.format(self.bflat)+','.join(blues) )
 
-        # go through and apply the correct flat for each object
-        allgroups = set([o[2] for o in self.objects])
-        allgroups.remove(1)    # skip the blues
-        for i in allgroups:
-            reds = [self.opf+self.rroot%o[0] for o in self.robjects+self.rarcs if o[2]==i]
-            if len(reds) != 0:
-                su.apply_flat( reds, 'nflat%d'%i )
-                self.log.info( '\nApplied flat nflat%d to the following files:\n'%i+',\n'.join(reds) )
+        reds = [self.opf+self.rroot%o[0] for o in self.robjects] +\
+               [self.apf+self.rroot%o[0] for o in self.rarcs]
+        su.apply_flat( reds, self.rflat )
+        self.log.info( '\nApplied flat {} to the following files:\n'.format(self.rflat)+','.join(reds) )
 
-        self.opf = 'fb' # f for flatfielded
-        self.apf = 'fb'
-
-    def reject_cosmic_rays(self):
-        """
-        Performs cosmic ray rejection on all objects.
-        """
-        self.log.info("Perfoming cosmic ray removal")
-        blues = [self.opf+self.broot%o[0] for o in self.bobjects]
-        for b in blues:
-            su.clean_cosmics( b, 'blue', plot=self.interactive )
-        self.log.info( '\nRemoved cosmic rays from the following files:\n'+',\n'.join(blues) )
-        reds = [self.opf+self.rroot%o[0] for o in self.robjects]
-        for r in reds:
-            su.clean_cosmics( r, 'red', plot=self.interactive )
-        self.log.info( '\nRemoved cosmic rays from the following files:\n'+',\n'.join(reds) )
-
-        self.opf = 'cfb'  # c for cosmic-ray removal
+        self.opf = 'ftcb' # f for flatfielded
+        self.apf = 'ftb'
 
     def calc_seeing(self):
         """
         Calculate the seeing for all objects and insert values into their header.
         """
-        self.log.info("Calculating seeing for all objects")
         allobjects = [self.opf+self.broot%o[0] for o in self.bobjects] +\
                      [self.opf+self.rroot%o[0] for o in self.robjects]
         su.calculate_seeing( allobjects, plot=self.interactive )
+        self.log.info("Estimated seeing for all objects")
 
     def extract_object_spectra(self, side=['red','blue']):
         """
         Extracts the spectra from each object.  Cannot be run automatically.
         """
         self.interactive = True
-        self.log.info('Extracting spectra for red objects')
         # extract all red objects on the first pass
         if 'red' in side:
             for o in self.robjects:
@@ -453,8 +509,9 @@ class Shiv(object):
                     print fname,'has already been extracted. Remove from self.extracted_images '+\
                                 'list if you want to run it again.'
                     continue
+                self.log.info('Extracting spectrum from {}'.format(fname))
                 # If we've already extracted a spectrum of this object, use it as a reference
-                irefs = [ i for i in range(len(self.extracted_images[0])) if self.extracted_images[0][i][1]==o[4] ]
+                irefs = [ i for i in range(len(self.extracted_images[0])) if self.extracted_images[0][i][1]==o[3] ]
                 if len(irefs) == 0:
                     reference = None
                 else:
@@ -477,13 +534,13 @@ class Shiv(object):
                 
                 if reference == None:
                     su.extract( fname, 'red', interact=True )
-                    self.log.info('Extracted '+fname)
                 else:
                     su.extract( fname, 'red', reference=reference[0] )
-                    self.log.info('Used ' + reference[0] + ' for reference on '+ fname +' (objects: '+reference[1]+' ::: '+o[4]+')')
+                    self.log.info('Used ' + reference[0] + ' for reference on '+ fname +' (objects: '+reference[1]+' ::: '+o[3]+')')
 
-                self.extracted_images[0].append( [fname,o[4]] )
+                self.extracted_images[0].append( [fname,o[3]] )
                 self.save()
+
         # extract all blue objects on the second pass
         if 'blue' in side:
             for o in self.bobjects:
@@ -493,11 +550,12 @@ class Shiv(object):
                     print fname,'has already been extracted. Remove from self.extracted_images '+\
                                 'list if you want to run it again.'
                     continue
+                self.log.info('Extracting spectrum from {}'.format(fname))
                 # If we've already extracted a blue spectrum of this object, use it for reference.
                 #  If we've extracted a red spectrum, use its apfile for reference,
                 #  accounting for differences in blue and red pixel scales.
-                blue_irefs = [ i for i in range(len(self.extracted_images[1])) if self.extracted_images[1][i][1]==o[4] ]
-                red_irefs = [ i for i in range(len(self.extracted_images[0])) if self.extracted_images[0][i][1]==o[4] ]
+                blue_irefs = [ i for i in range(len(self.extracted_images[1])) if self.extracted_images[1][i][1]==o[3] ]
+                red_irefs = [ i for i in range(len(self.extracted_images[0])) if self.extracted_images[0][i][1]==o[3] ]
                 if len(blue_irefs) == len(red_irefs) == 0:
                     reference = None
                 elif len(blue_irefs) != 0:
@@ -541,15 +599,15 @@ class Shiv(object):
                     if blueref:
                         # go ahead and simply use as a reference
                         su.extract( fname, 'blue', reference=reference[0], interact=True )
-                        self.log.info('Used ' + reference[0] + ' for reference on '+ fname +' (objects: '+reference[1]+' ::: '+o[4]+')')
+                        self.log.info('Used ' + reference[0] + ' for reference on '+ fname +' (objects: '+reference[1]+' ::: '+o[3]+')')
                     else:
                         # Need to pass along apfile and conversion factor to map the red extraction
                         #  onto this blue image. Blue CCD has a plate scale 1.8558 times larger than the red.
-                        apfile = 'database/ap'+reference[0].strip('.fits')
+                        apfile = 'database/ap'+os.path.splitext(reference[0])[0]
                         su.extract( fname, 'blue', apfile=apfile, interact=True )
-                        self.log.info('Used apfiles from ' + reference[0] + ' for reference on '+ fname +' (objects: '+reference[1]+' ::: '+o[4]+')')
+                        self.log.info('Used apfiles from ' + reference[0] + ' for reference on '+ fname +' (objects: '+reference[1]+' ::: '+o[3]+')')
 
-                self.extracted_images[1].append( [fname,o[4]] )
+                self.extracted_images[1].append( [fname,o[3]] )
                 self.save()
 
     def extract_object_special(self, side, iobject, **kwargs):
@@ -581,10 +639,11 @@ class Shiv(object):
             raise StandardError('Side must be one of "red", "blue"')
 
         su.extract( fname, side, interact=True, **kwargs )
+        self.log.info('Extracting spectrum from {} using custom parameters'.format(fname))
         if (side == 'red') and (fname not in [extracted[0] for extracted in self.extracted_images[0]]):
-            self.extracted_images[0].append( [fname,o[4]] )
+            self.extracted_images[0].append( [fname,o[3]] )
         if (side == 'blue') and (fname not in [extracted[0] for extracted in self.extracted_images[1]]):
-            self.extracted_images[1].append( [fname,o[4]] )
+            self.extracted_images[1].append( [fname,o[3]] )
 
     def splot(self, filename ):
         """
@@ -592,90 +651,79 @@ class Shiv(object):
         """
         su.iraf.splot( filename )
 
-    def extract_arc_spectra(self):
+    def extract_arc_spectra(self, refblue=None, refred=None):
         """
         Extracts the spectra from each arc.
         """
-        self.log.info('Extracting arc spectra')
-        # extract the blue arc from the beginning of the night using the first blue
-        #  object as the reference
-        bluearc = self.apf+self.broot%(self.barcs[0][0])
-        refblue = self.opf+self.broot%(self.bobjects[0][0])
+        # extract the blue arcs using the first blue object as the reference
+        bluearcs = [self.apf+self.broot%o[0] for o in self.barcs]
+        if len(bluearcs) > 1:
+            raise Exception('Found more than one blue arc image!')
+        bluearc = bluearcs[0]
+        if refblue == None:
+            refblue = self.opf+self.broot%(self.bobjects[0][0])
         su.extract( bluearc, 'blue', arc=True, reference=refblue )
         self.log.info('Extracted blue arc spectrum '+bluearc+' using '+refblue+' as a reference')
 
-        # extract the red arcs, using each associated object as a reference
-        allgroups = set([o[2] for o in self.objects])
-        allgroups.remove(1)    # skip the blues
-        for i in allgroups:
-            redarcs = [self.apf+self.rroot%o[0] for o in self.rarcs if o[2]==i]
-            refred = [self.opf+self.rroot%o[0] for o in self.robjects if o[2]==i][0]
-            for redarc in redarcs:
-                su.extract( redarc, 'red', arc=True, reference=refred )
-                self.log.info('Extracted red arc spectrum '+redarc+' using '+refred+' as a reference')
+        # extract the red arcs using the first red object as the reference
+        redarcs = [self.apf+self.rroot%o[0] for o in self.rarcs]
+        if refred == None:
+            refred = self.opf+self.rroot%(self.robjects[0][0])
+        for redarc in redarcs:
+            su.extract( redarc, 'red', arc=True, reference=refred )
+            self.log.info('Extracted red arc spectrum '+redarc+' using '+refred+' as a reference')
 
-    def id_arcs(self):
+    def id_arcs(self, combined_red_name='Combined_0.5_Arc.ms.fits'):
         """
         Go through and identify and fit for the lines in all arc files. Requires
          human interaction.
         """
-        self.log.info("Identifying arc lines and fitting for wavelength solutions")
-        # ID the blue side arc
-        su.run_cmd( 'xdg-open %s'%su.BLUEARCIMG, ignore_errors=True )
-        bluearc = self.apf+self.ebroot%(self.barcs[0][0])
-        su.id_arc( bluearc, side='b' )
-        self.log.info("Successfully ID'd "+bluearc)
+        # ID the blue side arc; define which one we'll use
+        #  to calibrate later on
+        bluearcs = [self.apf+self.broot%o[0] for o in self.barcs]
+        if len(bluearcs) > 1:
+            raise Exception('Found more than one blue arc image!')
+        inn = raw_input('\nView the blue arc lamp reference image? (y/n)[y]\n')
+        if 'n' not in inn.lower():
+            su.run_cmd( 'xdg-open %s'%su.BLUEARCIMG, ignore_errors=True )
+        
+        self.bluearc = bluearcs[0]
+        su.id_arc( self.bluearc, side='b' )
+        self.log.info("Successfully ID'd arc lamp lines from "+self.bluearc)
 
         # sum the R1 and R2 red arcs from the beginning of the night and id the result
-        su.run_cmd( 'xdg-open %s'%su.REDARCIMG, ignore_errors=True )
         R1R2 = [self.apf+self.erroot%o[0] for o in self.rarcs][:2]
-        su.combine_arcs( R1R2, 'Combined_0.5_Arc.ms.fits' )
-        self.log.info("Created Combined_0.5_Arc.ms.fits from "+str(R1R2))
-        su.id_arc( 'Combined_0.5_Arc.ms.fits', side='r' )
-        self.log.info("Successfully ID'd Combined_0.5_Arc.ms.fits" )
+        su.combine_arcs( R1R2, combined_red_name )
+        self.log.info( "Created {} from {}".format(combined_red_name,R1R2) )
+        inn = raw_input('\nView the red arc lamp reference image? (y/n)[y]\n')
+        if 'n' not in inn.lower():
+            su.run_cmd( 'xdg-open %s'%su.REDARCIMG, ignore_errors=True )
+        self.redarc = combined_red_name
+        su.id_arc( self.redarc, side='r' )
+        self.log.info("Successfully ID'd arc lamp lines from "+self.redarc)
 
-        # ID the first red object arc interactively, making sure
-        #  we handle the 0.5" arcs properly
-        firstobjarc = [self.apf+self.erroot%o[0] for o in self.rarcs][2]
-        su.reid_arc( firstobjarc, 'Combined_0.5_Arc.ms.fits')
-        self.log.info("ID'd "+firstobjarc+" using Combined_0.5_Arc.ms.fits as a reference")
-
-        # Now go through all other red arcs, using the result of the above step to calibrate them.
-        allgroups = set([o[2] for o in self.objects])
-        allgroups.remove(1)    # skip the blues
-        allgroups.remove( self.robjects[0][2] )    # and skip the first object's arcs
-        for i in allgroups:
-            objarc = [self.apf+self.erroot%o[0] for o in self.rarcs if o[2]==i][0]
-            su.reid_arc( objarc, firstobjarc )
-            self.log.info("ID'd "+objarc+" using "+firstobjarc+" as a reference")
 
     def apply_wavelength(self, force=True):
         """
         Apply the relevant wavelength solution to each object.
         If force==True, will delete previous file before applying solution.
         """
-        self.log.info("Appying wavelength solution to all objects")
-        bluearc = self.apf+self.ebroot%(self.barcs[0][0])
         for o in self.bobjects:
             image = self.opf+self.ebroot%o[0]
             if force:
                 su.run_cmd( 'rm d%s'%image, ignore_errors=True )
-            su.disp_correct( image, bluearc )
-            self.log.info("Applied wavelength solution from "+bluearc+" to "+self.opf+self.ebroot%o[0])
+            su.disp_correct( image, self.bluearc )
+            self.log.info("Applied wavelength solution from "+self.bluearc+" to "+self.opf+self.ebroot%o[0])
 
+        red = self.apf+self.ebroot%(self.barcs[0][0])
         for o in self.robjects:
-            # first red object includes the beginning arcs; account for that
-            redarcs = [self.apf+self.erroot%a[0] for a in self.rarcs if a[2]==o[2]]
-            if o[2] == 2:
-                redarc = redarcs[2]
-            else:
-                redarc = redarcs[0]
             image = self.opf+self.erroot%o[0]
             if force:
                 su.run_cmd( 'rm d%s'%image, ignore_errors=True )
-            su.disp_correct( image, redarc )
-            self.log.info("Applied wavelength solution from "+redarc+" to "+self.opf+self.erroot%o[0])
-        self.opf = 'dcfb' # d for dispersion-corrected
+            su.disp_correct( image, self.redarc )
+            self.log.info("Applied wavelength solution from "+self.redarc+" to "+self.opf+self.ebroot%o[0])
+
+        self.opf = 'dftcb' # d for dispersion-corrected
 
     def flux_calibrate(self, side=None):
         """

@@ -18,6 +18,7 @@ Notes:
     minima in the standard star spectra, afterwhich you can fit
     with spectools.
  - e.g.: mins = scipy.signal.argrelmin( fl, order=25 )
+
 """
 
 ######################################################################
@@ -45,6 +46,7 @@ import re
 from tools import cosmics as cr
 from tools import credentials
 from tools import check_log
+from tools.overscanLickObs import overscan_bias
 from tools.astrotools import smooth,fit_gaussian
 
 ######################################################################
@@ -53,15 +55,12 @@ from tools.astrotools import smooth,fit_gaussian
 
 # kast parameters
 # pulled from previous codes or from https://mthamilton.ucolick.org/techdocs/instruments/kast/kast_quickReference.html
-REDGAIN=3.0
-REDRDNOISE=12.5
-BLUEBIAS1='[2052:2080,*]'
-BLUEBIAS2='[2082:2110,*]'
+REDGAIN=1.9
+REDRDNOISE=3.8
 BLUEGAIN1=1.2
 BLUEGAIN2=1.237
 BLUERDNOISE=3.7
-KASTAPFACT=1.8558
-REDPIXSCALE=0.78 #arcsec/pix in spatial scale
+REDPIXSCALE=0.43 #arcsec/pix in spatial scale
 BLUEPIXSCALE=0.43
 
 # give the path to the IDL executable and home folders
@@ -124,19 +123,19 @@ def populate_working_dir( runID, logfile=None, all_obs=None ):
     
     # copy over all relevant files to working directory and rename them
     for o in all_obs:
-        if o[1] == 1:
+        if o[1] == 'b':
             prefix = 'blue'
-        elif o[1] == 2:
+        elif o[1] == 'r':
             prefix = 'red'
         # if there are updated files (i.e. r001.fits.1) use the one observed last
-        fs = glob( '../rawdata/%s%d.fits.*' %(prefix[0], o[0]) )
+        fs = glob( '../rawdata/{}{}.fits.*' .format(prefix[0], o[0]) )
         if not fs:
-            run_cmd( 'cp ../rawdata/%s%d.fits %s%s%.3d.fits' %(prefix[0],o[0], runID,prefix,o[0]) )
+            run_cmd( 'cp ../rawdata/{}{}.fits {}{}{:03d}.fits'.format(prefix[0],o[0], runID,prefix,o[0]) )
         else:
             fs.sort( key=lambda x: x[-1] )
             fname = fs[-1]
-            print 'Multiple versions of %s%d; using %s!' %(prefix[0],o[0], fname)
-            run_cmd( 'cp %s %s%s%.3d.fits' %(fname,runID,prefix,o[0]))
+            print 'Multiple versions of {}{}; using {}!'.format(prefix[0],o[0], fname)
+            run_cmd( 'cp {} {}{}{:03d}.fits'.format(fname,runID,prefix,o[0]))
     
     # change permissions
     run_cmd( 'chmod a+rw *.fits' )
@@ -195,12 +194,12 @@ def get_kast_data( datestring, outfile=None, unpack=True,
 def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None, infile=None,
                un=credentials.wiki_un, pw=credentials.wiki_pw ):
     """
-    If given infile, will parse that logfile (SilverClubb format, but including object names).
+    If given infile, will parse that logfile (Shivvers format, updated in Fall 2016).
     If not given infile, must be given pagename OR (runID and datestring),
      and this script will download and parse the log from the wiki page.
     - datestring: a parsable string representing the recorded log's date
     - runID: the alphabetical id for the run
-    - outfile: include a path to write out a silverclubb-formatted logfile, if desired
+    - outfile: include a path to write out a formatted logfile, if desired
     """
     if infile != None:
         objects, arcs, flats = check_log.load_elog( infile )
@@ -275,57 +274,59 @@ def head_update( images, keywords, values, comment=None ):
         hdu.close()
 
 ############################################################################
-# bias, flatfielding, header updates
+# rotations of red-side CCD
 ############################################################################
 
-def bias_correct(images, y1, y2, prefix=None):
+def rotate(images, angle, prefix=None):
     """
-    Bias correct and trim a set of images with y trim limits
-     of y1, y2.
+    Using iraf's rotate command, rotate <images> by <angle>
+     (in degrees, counter-clockwise).
+
+    Assumes that point of rotation is lower left corner of image.
     """
+    if prefix == None:
+        prefix = ''
+
+    for image in images:
+        iraf.rotate( image, prefix+image, angle, 
+                     xin=1, xout=1, yin=1, yout=1,
+                     nxblock=3000, nyblock=3000,
+                     interpo='spline3' )
+    
+def transpose(images, prefix=None):
+    """
+    Using iraf's transpose command, simply transpose the rows and columns
+     of an image.
+    """
+    if prefix == None:
+        prefix = '' 
+
+    for image in images:
+        iraf.imtranspose( image, prefix+image )
+
+############################################################################
+# bias, trim, flatfielding, header updates
+############################################################################
+
+def overscan_bias_correct(images, prefix=None):
     if prefix==None:
         prefix = 'b'
-    
+
     for image in images:
-        # open file and get parameters
+        overscan_bias( [image], [prefix+image] )
+
+def trim(images, y1, y2, prefix=None):
+    """
+    Maybe needs testing after new bias?
+
+    """
+    if prefix == None:
+        prefix = 't'
+
+    for image in images:
+        # open file and trim it
         fits = pf.open( image )[0]
-        
-        cover = fits.header['COVER']    #number of overscan columns
-        naxis1 = fits.header['NAXIS1'] #number of columns total
-        side = fits.header['VERSION']
-        
-        bbuf = 2 # buffer size to trim from bias section to account for stray light
-        dbuf = 2 # buffer size to trim from data section (in x dimension)
-        if side == 'kastr':
-            # pull out and average the overscan/bias section,
-            #  letting there be a small buffer for stray light
-            bias = np.mean( fits.data[y1:y2, -(cover-bbuf):], 1 )
-            # get the trimmed section
-            trimmed_data = fits.data[y1:y2, dbuf:-(cover+dbuf)]
-            # apply the bias correction per row
-            corrected_data = np.zeros_like(trimmed_data)
-            for row in range(trimmed_data.shape[0]):
-                corrected_data[row,:] = (trimmed_data[row,:] - bias[row]) * REDGAIN
-        
-        elif side == 'kastb':
-            # pull out and average the two different overscan/bias sections
-            #  (one for each amplifier). use a small buffer to account for any stray light
-            bias1 = np.mean( fits.data[y1:y2,-(cover*2-bbuf):-cover], 1 )
-            bias2 = np.mean( fits.data[y1:y2,-cover:], 1 )
-            # the midpoint dividing the two amplifiers; SLIGHTLY DIFFERENT THAN KASTBIAS.PRO!!
-            mid = (naxis1 - 2*cover)/2
-            # get the trimmed sections for each amplifier
-            trimmed_data1 = fits.data[y1:y2, dbuf:mid]
-            trimmed_data2 = fits.data[y1:y2, mid:-(cover*2+dbuf)]
-            # apply the bias correction
-            corrected_data1 = np.zeros_like(trimmed_data1)
-            for row in range(trimmed_data1.shape[0]):
-                corrected_data1[row,:] = (trimmed_data1[row,:] - bias1[row]) * BLUEGAIN1
-            corrected_data2 = np.zeros_like(trimmed_data2)
-            for row in range(trimmed_data2.shape[0]):
-                corrected_data2[row,:] = (trimmed_data2[row,:] - bias2[row]) * BLUEGAIN2
-            # join the two sides back together
-            corrected_data = np.hstack( (corrected_data1, corrected_data2) )
+        trimmed_data = fits.data[y1:y2, :]
         
         # remove the DATASEC keyheader keyword if it exists
         try:
@@ -334,7 +335,8 @@ def bias_correct(images, y1, y2, prefix=None):
             pass
         
         # write to file
-        pf.writeto( prefix+image, corrected_data, fits.header, output_verify='warn' )
+        pf.writeto( prefix+image, trimmed_data, fits.header, output_verify='warn' )
+
 
 ############################################################################
 
@@ -348,11 +350,11 @@ def make_flat(images, outflat, side, interactive=True):
     if side == 'red':
         gain = REDGAIN
         rdnoise = REDRDNOISE
-        fitorder = 4
+        fitorder = 9
     elif side == 'blue':
         gain = BLUEGAIN1
         rdnoise = BLUERDNOISE
-        fitorder = 6
+        fitorder = 4
     else:
         raise StandardError( "side must be one of 'red','blue'" )
     
@@ -384,7 +386,7 @@ def apply_flat(images, flat, prefix='f' ):
     """
     for image in images:
         iraf.ccdproc(image, output='%s%s' %(prefix,image),
-                     flatcor=yes, flat=flat,
+                     flatcor=yes, flat=flat, order=9,
                      ccdtype='', noproc=no, fixpix=no, 
                      overscan=no, trim=no, zerocor=no, darkcor=no,
                      illumcor=no, fringecor=no, readcor=no, scancor=no)
@@ -683,7 +685,7 @@ def extract( image, side, arc=False, interact=True, reference=None, trace_only=F
     elif (apfile != None):
         ap, lbg, rbg = parse_apfile( apfile )
         if apfact == None:
-            apfact = KASTAPFACT
+            apfact = REDPIXSCALE / BLUEPIXSCALE
         print 'Extracting object using reference apfile and apfact=%.2f.'%apfact
         ap_params['references'] = ''
         ap_params['find']       = yes
@@ -721,10 +723,11 @@ def clean_cosmics( fitspath, side, cleanpath=None, maskpath=None, plot=False ):
     if side == 'red':
         gain = REDGAIN
         rdnoise = REDRDNOISE
-        sigclip = 10.0
-        sigfrac = 8.0
-        maxiter = 3
-        objlim = 2.0
+        sigclip = 5.0
+        sigfrac = 0.5
+        maxiter = 5
+        objlim = 1.0
+        satlevel = 50000
     elif side == 'blue':
         gain = BLUEGAIN1
         rdnoise = BLUERDNOISE
@@ -732,23 +735,32 @@ def clean_cosmics( fitspath, side, cleanpath=None, maskpath=None, plot=False ):
         sigfrac = 3.0
         maxiter = 3
         objlim = 2.0
+        satlevel = 50000
     
     array, header = cr.fromfits(fitspath)
-    c = cr.cosmicsimage(array, gain=gain, readnoise=rdnoise,
+    c = cr.cosmicsimage(array, gain=gain, readnoise=rdnoise, satlevel=satlevel,
                         sigclip=sigclip, sigfrac=sigfrac, objlim=objlim)
     c.run(maxiter=maxiter)
     cr.tofits(cleanpath, c.cleanarray, header)
     if maskpath != None:
         cr.tofits(maskpath, c.mask, header)
     if plot:
-        fig,axs = plt.subplots( 3, 1, sharex=True )
+        if side == 'blue':
+            fig,axs = plt.subplots( 3, 1, sharex=True )
+            axs[0].set_title( 'Cosmic ray removal: %s'%fitspath )
+            axs[0].set_ylabel( 'input' )
+            axs[1].set_ylabel( 'CRs' )
+            axs[2].set_ylabel( 'cleaned' )
+        elif side == 'red':
+            fig,axs = plt.subplots( 1, 3, sharex=True )
+            axs[0].set_ylabel( 'Cosmic ray removal: %s'%fitspath )
+            axs[0].set_title( 'input' )
+            axs[1].set_title( 'CRs' )
+            axs[2].set_title( 'cleaned' )
         axs[0].imshow( np.log10(c.rawarray).T )
         axs[1].imshow( np.log10(c.rawarray-c.cleanarray).T )
         axs[2].imshow( np.log10(c.cleanarray).T )
-        axs[0].set_title( 'Cosmic ray removal: %s'%fitspath )
-        axs[0].set_ylabel( 'input' )
-        axs[1].set_ylabel( 'CRs' )
-        axs[2].set_ylabel( 'cleaned' )
+
         for ax in axs:
             ax.set_yticks([])
             ax.set_xticks([])
@@ -781,7 +793,7 @@ def id_standard( obj_name ):
     try:
         std_name = get_close_matches( obj_name, standards, 1 )[0]
     except IndexError:
-        print 'no match for',obj_name
+        # print 'no match for',obj_name
         return None
     print 'identified',obj_name,'as',std_name
     return std_name, standards[std_name]
@@ -890,7 +902,11 @@ def calibrate_idl( input_dict, idlpath=IDLPATH, cleanup=True ):
         print 'Input file: cal.input'
         print 'Type "cal"\n'
         
-        start_idl()
+        while True:
+            start_idl()
+            inn = raw_input('\nTry again? (y/n)[n]\n')
+            if 'y' not in inn:
+                    break
 
 ######################################################################
 
@@ -1092,7 +1108,7 @@ def sumsqerr(p, x, y):
     
 ######################################################################
 
-def find_trim_sec( flatfile, edgebuf=5, plot=True ):
+def find_trim_sec( flatfile, edgebuf=10, plot=True ):
     """
     Find the optimal y-axis trim values from flatfile.
      edge: the size of the edge buffer in pixels
