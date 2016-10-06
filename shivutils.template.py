@@ -354,11 +354,11 @@ def make_flat(images, outflat, side, interactive=True):
     if side == 'red':
         gain = REDGAIN
         rdnoise = REDRDNOISE
-        fitorder = 9
+        fitorder = 30
     elif side == 'blue':
         gain = BLUEGAIN1
         rdnoise = BLUERDNOISE
-        fitorder = 4
+        fitorder = 6
     else:
         raise StandardError( "side must be one of 'red','blue'" )
     
