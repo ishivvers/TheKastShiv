@@ -169,11 +169,13 @@ def start_idl( idlpath=IDLPATH ):
 
 ############################################################################
 
-def get_kast_data( datestring, outfile=None, unpack=True, 
+def get_kast_data( datestring, outfile=None, unpack=True, override_files=False,
                    un=credentials.repository_un, pw=credentials.repository_pw ):
     """
     Download kast data from a date (in the datestring).
     """
+    if (not override_files) and (len(glob('*.fits')) > 0):
+        raise Exception('Files already exist!')
     if outfile == None:
         outfile = 'alldata.tgz'
     date = date_parser.parse(datestring)
