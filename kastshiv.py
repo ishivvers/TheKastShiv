@@ -33,7 +33,7 @@ class Shiv(object):
     """
     
     def __init__(self, runID, interactive=False, savefile=None, logfile=None,
-                 datePT=None, dateUT=None, inlog=None, pagename=None):
+                 datePT=None, dateUT=None, inlog=None, pagename=None, parallel=False):
         self.runID = runID
         self.interactive = interactive
         self.datePT = datePT
@@ -47,8 +47,10 @@ class Shiv(object):
             self.savefile = os.path.abspath('.') + '/' + self.runID + '.sav'
         else:
             self.savefile = savefile
-        if PARALLEL:
+        if PARALLEL and parallel:
             self.parallel = True
+        else:
+            self.parallel = False
 
         # set up the logfile
         if logfile == None:
@@ -375,11 +377,11 @@ class Shiv(object):
             pool.map( f, blues )
         else:
             for b in blues:
-                su.clean_cosmics( b, 'blue', plot=False )
+                su.clean_cosmics( b, 'blue', plot=self.interactive )
 
         reds = [self.opf+self.rroot%o[0] for o in self.robjects]
         if self.parallel:
-            f = lambda r: su.clean_cosmics( r, 'red', plot=self.interactive )
+            f = lambda r: su.clean_cosmics( r, 'red', plot=False )
             pool = multiprocessing.ProcessingPool()
             pool.map( f, reds )
         else:
