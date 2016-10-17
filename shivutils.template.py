@@ -356,7 +356,7 @@ def make_flat(images, outflat, side, interactive=True):
     if side == 'red':
         gain = REDGAIN
         rdnoise = REDRDNOISE
-        fitorder = 30
+        fitorder = 18
     elif side == 'blue':
         gain = BLUEGAIN1
         rdnoise = BLUERDNOISE
@@ -393,7 +393,7 @@ def apply_flat(images, flat, prefix='f' ):
     for image in images:
         iraf.ccdproc(image, output='%s%s' %(prefix,image),
                      flatcor=yes, flat=flat, order=9,
-                     ccdtype='', noproc=no, fixpix=no, 
+                     ccdtype='', noproc=no, fixpix=no,
                      overscan=no, trim=no, zerocor=no, darkcor=no,
                      illumcor=no, fringecor=no, readcor=no, scancor=no)
     
@@ -729,10 +729,10 @@ def clean_cosmics( fitspath, side, cleanpath=None, maskpath=None, plot=False ):
     if side == 'red':
         gain = REDGAIN
         rdnoise = REDRDNOISE
-        sigclip = 5.0
+        sigclip = 6.0
         sigfrac = 0.5
         maxiter = 5
-        objlim = 1.0
+        objlim = 3.0
         satlevel = 50000
     elif side == 'blue':
         gain = BLUEGAIN1
@@ -752,13 +752,13 @@ def clean_cosmics( fitspath, side, cleanpath=None, maskpath=None, plot=False ):
         cr.tofits(maskpath, c.mask, header)
     if plot:
         if side == 'blue':
-            fig,axs = plt.subplots( 3, 1, sharex=True )
+            fig,axs = plt.subplots( 3, 1, sharex=True, sharey=True )
             axs[0].set_title( 'Cosmic ray removal: %s'%fitspath )
             axs[0].set_ylabel( 'input' )
             axs[1].set_ylabel( 'CRs' )
             axs[2].set_ylabel( 'cleaned' )
         elif side == 'red':
-            fig,axs = plt.subplots( 1, 3, sharex=True )
+            fig,axs = plt.subplots( 1, 3, sharex=True, sharey=True )
             axs[0].set_ylabel( 'Cosmic ray removal: %s'%fitspath )
             axs[0].set_title( 'input' )
             axs[1].set_title( 'CRs' )
