@@ -424,7 +424,7 @@ class Shiv(object):
         blues = [self.opf+self.broot%o[0] for o in self.bobjects] +\
                [self.apf+self.broot%o[0] for o in self.barcs] +\
                [self.fpf+self.broot%o[0] for o in self.bflats]
-        su.trim( blues, y1=self.r_ytrim[0], y2=self.r_ytrim[1] )
+        su.trim( blues, y1=self.b_ytrim[0], y2=self.b_ytrim[1] )
 
         reds = [self.opf+self.rroot%o[0] for o in self.robjects] +\
                [self.apf+self.rroot%o[0] for o in self.rarcs] +\
@@ -515,6 +515,7 @@ class Shiv(object):
 
                 # give the user some choice here
                 print '\nCurrent image:',fname
+                print 'Object:', o[-1]
                 inn = raw_input('\nView image with ds9? [y/n](n):\n')
                 if 'y' in inn.lower():
                     os.system('ds9 -scale log -geometry 1200x600 %s &' %fname)
@@ -562,6 +563,7 @@ class Shiv(object):
                 
                 # give the user some choice here
                 print '\nCurrent image:',fname
+                print 'Object:', o[-1]
                 inn = raw_input('\nView image with ds9? [y/n](n):\n')
                 if 'y' in inn.lower():
                     os.system('ds9 -scale log -geometry 1200x600 -zoom 0.6 %s &' %fname)
