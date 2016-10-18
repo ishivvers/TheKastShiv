@@ -3,7 +3,10 @@ The Kast Shiv: a Kast spectrocscopic reduction pipeline
  written by I.Shivvers (modified from the K.Clubb/J.Silverman/R.Foley/R.Chornock/T.Matheson
  pipeline and the B.Cenko pipeline - thanks everyone).
 
+To Do:
 
++ add funciton to re-do extraction by object
++ add how-to in comments
 """
 
 import shivutils as su
@@ -642,6 +645,23 @@ class Shiv(object):
             self.extracted_images[0].append( [fname,o[3]] )
         if (side == 'blue') and (fname not in [extracted[0] for extracted in self.extracted_images[1]]):
             self.extracted_images[1].append( [fname,o[3]] )
+
+    def redo_extraction(self, object_name, side=['red','blue']):
+        """
+        Remove images of the object from self.extracted_images list, so
+         that running self.extract_object_spectra() will
+         re-extract all spectra of that object.
+        """
+        smap = {'red':0,'blue':1}
+        if type(side) != list:
+            side = list(side)
+        for s in side:
+            i = smap[s]
+            newlist = []
+            for row in self.extracted_images[i]:
+                if row[1] != object_name:
+                    newlist.append( row )
+            self.extracted_images[i] = newlist
 
     def splot(self, filename ):
         """
