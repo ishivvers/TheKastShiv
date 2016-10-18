@@ -8,16 +8,11 @@ Steals heavily from Brad Cenko's kast_redux and iqutils packages,
 as well as the K.Clubb/J.Silverman/R.Foley/R.Chornock/T.Matheson reduction pipeline.
 (Thanks everyone!)
 More information on that pipeline, and the reasoning behind it,
-here: http://heracles.astro.berkeley.edu/wiki/doku.php?id=kast_reduction_guide
+is available here:
+http://heracles.astro.berkeley.edu/wiki/doku.php?id=kast_reduction_guide
 
 Requires a working installation of IDL and the Ureka Python setup:
 http://ssb.stsci.edu/ureka/
-
-Notes:
- - the scipy.signal.argrelmin function may be helpful to find
-    minima in the standard star spectra, afterwhich you can fit
-    with spectools.
- - e.g.: mins = scipy.signal.argrelmin( fl, order=25 )
 
 """
 
@@ -94,9 +89,12 @@ INDEF=iraf.INDEF
 ############################################################################
 
 def make_file_system( runID ):
-    """
-    Creates the file system heirarchy for kast reductions, with
-     the root location where the command was run from.
+    """ Creates the file system heirarchy for kast reductions. 
+    Uses the location the command was run from as a root.
+
+    Arguments:
+    runID -- String; name/runID for this observation run. Will use this
+             as name for subfolder.
     """
     os.mkdir(runID)
     os.chdir(runID)
@@ -109,11 +107,17 @@ def make_file_system( runID ):
 ############################################################################
 
 def populate_working_dir( runID, logfile=None, all_obs=None ):
-    """
-    Take the unpacked data from the raw directory, rename files as necessary,
+    """ Take the unpacked data from the raw directory, rename files as necessary,
      and move them into the working directory.
-    Should be run from working directory, and either logfile (path to file)
-     or all_obs (list of observations, i.e. result of wiki2elog) must be given.
+    Should be run from working directory.
+
+    Arguments: 
+    runID -- String; name/runID for this observation run.
+    
+    Keyword arguments:
+    logfile -- String; path to observation log file to reference.
+    all_obs -- Set of lists of observations, I.E. result of wiki2elog),
+               One of logfile or all_obs must be given.
     """
     
     if logfile != None:
@@ -145,8 +149,13 @@ def populate_working_dir( runID, logfile=None, all_obs=None ):
 ######################################################################
 
 def run_cmd( cmd, ignore_errors=False ):
-    """
-    Wrapper for running external commands.
+    """ Wrapper for running external commands.
+
+    Arguments:
+    cmd -- String; UNIX command to run.
+
+    Keyword arguments:
+    ignore_errors -- Boolean; self-explanatory.
     """
     res = os.system( cmd )
     if not ignore_errors:
@@ -156,8 +165,11 @@ def run_cmd( cmd, ignore_errors=False ):
 ############################################################################
 
 def start_idl( idlpath=IDLPATH ):
-    """
-    start an interactive IDL session.
+    """ Start an interactive IDL session and put the
+    user into it.
+    
+    Keyword arguments:
+    idlpath -- String; path to IDL executable.
     """
     try:
         session = IDL( idlpath )
@@ -171,8 +183,17 @@ def start_idl( idlpath=IDLPATH ):
 
 def get_kast_data( datestring, outfile=None, unpack=True, override_files=False,
                    un=credentials.repository_un, pw=credentials.repository_pw ):
-    """
-    Download kast data from a date (in the datestring).
+    """ Download kast data.
+
+    Arguments:
+    datestring -- String; the date (in Pacific Time) of the night of the run.
+
+    Keyword arguments:
+    outfile -- String; path to tarball to download the data to.
+    unpack -- Boolean; whether or not to unpack the downloaded tarball.
+    override_files -- Boolean; whether or not to override files you've already downloaded.
+    un -- String; username for data repository.
+    pw -- String; password for data repository.
     """
     if (not override_files) and (len(glob('*.fits')) > 0):
         raise Exception('Files already exist!')
@@ -195,13 +216,21 @@ def get_kast_data( datestring, outfile=None, unpack=True, override_files=False,
 
 def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None, infile=None,
                un=credentials.wiki_un, pw=credentials.wiki_pw ):
-    """
+    """ Take a wiki page or a obslog file and return formatted
+    lists of objects, arcs, and flats.
+
+    Keyword arguments:
+    datestring -- String; date to use to try and infer the correct wiki page.
+    runID -- String; name/runID for this observation run.
+    pagename -- String; wiki page name to reference. (String following '?id=' in the URL.)
+    outfile -- String; path to output file to save the parsed wiki log.
+    infile -- String; path to input logfile to create lists from.
+    un -- String; username for data repository.
+    pw -- String; password for data repository.
+
     If given infile, will parse that logfile (Shivvers format, updated in Fall 2016).
     If not given infile, must be given pagename OR (runID and datestring),
      and this script will download and parse the log from the wiki page.
-    - datestring: a parsable string representing the recorded log's date
-    - runID: the alphabetical id for the run
-    - outfile: include a path to write out a formatted logfile, if desired
     """
     if infile != None:
         objects, arcs, flats = check_log.load_elog( infile )
@@ -225,8 +254,11 @@ def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None, infile=
 ############################################################################
 
 def head_get( image, keywords ):
-    '''
-    Get given keywords from the given fits image.
+    ''' Get given keywords from the given fits image.
+
+    Arguments:
+    image -- String; path to image to pull header info from.
+    keywords -- String or list of strings; header keywords to pull.
     '''
     if type(keywords) != list:
         keywords = [keywords]
@@ -240,8 +272,11 @@ def head_get( image, keywords ):
 ############################################################################
 
 def head_del( images, keywords ):
-    '''
-    Remove given keywords from fits images.
+    ''' Remove given keywords from fits images.
+
+    Arguments:
+    image -- String; path to image to delete header info from.
+    keywords -- String or list of strings; header keywords to delete.
     '''
     if type(images) != list:
         images = [images]
@@ -257,11 +292,16 @@ def head_del( images, keywords ):
 ############################################################################
 
 def head_update( images, keywords, values, comment=None ):
-    '''
-    Update (or set) given keywords to given values for every image
-     in given images.
-    If comment is included, will add that comment to every updated keyword.
-    ''' 
+    """ Update (or set) given keywords to given values.
+
+    Arguments:
+    images -- String or list of strings; images of which to update the headers.
+    keywords -- String or list of strings; keywords to update.
+    values -- String or list of strings; values to update the keywords to.
+    
+    Keyword arguments:
+    comment -- String; if included, will add that comment to every updated keyword.
+    """
     if type(images) != list:
         images = [images]
     if type(keywords) != list:
@@ -281,10 +321,15 @@ def head_update( images, keywords, values, comment=None ):
 
 def rotate(images, angle, prefix=None):
     """
-    Using iraf's rotate command, rotate <images> by <angle>
-     (in degrees, counter-clockwise).
-
+    Using iraf's rotate command, rotate images.
     Assumes that point of rotation is lower left corner of image.
+
+    Arguments:
+    images -- List of strings; paths to images to rotate.
+    angle -- Float; angle by which to rotate all images CCW, in degrees.
+
+    Keyword arguments:
+    prefix -- String; will pre-pend any given string to output files.
     """
     if prefix == None:
         prefix = ''
@@ -297,20 +342,37 @@ def rotate(images, angle, prefix=None):
     
 def transpose(images, prefix=None):
     """
-    Using iraf's transpose command, simply transpose the rows and columns
-     of an image.
+    Using iraf's transpose command, rotate an image
+    90 degrees clockwise.  This is the rotation required
+    to get the red-side CCD image into the same orientation
+    as that of the blue.
+
+    Arguments:
+    images -- List of strings; paths to images to transpose.
+
+    Keyword arguments:
+    prefix -- String; will pre-pend any given string to output files.
     """
     if prefix == None:
         prefix = '' 
 
     for image in images:
-        iraf.imtranspose( image, prefix+image )
+        iraf.imtranspose( image+'[-*,*]', prefix+image )
 
 ############################################################################
 # bias, trim, flatfielding, header updates
 ############################################################################
 
 def overscan_bias_correct(images, prefix=None):
+    """ Bias corrects images using overscanLickObs.py by E.Gates.
+    Handles both blue-side and red-side images appropriately.
+
+    Arguments:
+    images -- List of strings; paths to images to bias correct.
+
+    Keyword arguments:
+    prefix -- String; will pre-pend any given string to output files.
+    """
     if prefix==None:
         prefix = 'b'
 
@@ -318,6 +380,15 @@ def overscan_bias_correct(images, prefix=None):
         overscan_bias( [image], [prefix+image] )
 
 def trim(images, y1=None, y2=None, x1=None, x2=None, prefix=None):
+    """ Trims images.
+
+    Keyword arguments:
+    y1 -- Int; lower y boundary.
+    y2 -- Int; upper y boundary.
+    x1 -- Int; left x boundary.
+    x2 -- Int; right x boundary.
+    prefix -- String; will pre-pend any given string to output files.
+    """
     if prefix == None:
         prefix = 't'
 
@@ -347,12 +418,14 @@ def trim(images, y1=None, y2=None, x1=None, x2=None, prefix=None):
 ############################################################################
 
 def make_flat(images, outflat, side, interactive=True):
-
-    '''
-    Construct median flat from individual frames, and then
+    """ Construct median flat from individual frames, and then
      normalize by fitting a response function.
-    side must be one of "red" or "blue"
-    '''
+
+    Arguments:
+    images -- List of strings; paths to images to construct flat from.
+    outflat -- String; name of output flat image.
+    side -- String; must be one of "red" or "blue".`
+    """
     if side == 'red':
         gain = REDGAIN
         rdnoise = REDRDNOISE
