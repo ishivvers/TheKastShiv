@@ -10,12 +10,7 @@ import pickle
 import re
 import pyfits as pf
 from glob import glob
-# The names of these packages are different between my mac and my linux
-try:
-    from bs4 import BeautifulSoup
-except:
-    print 'Cannot locate package bs4, trying BeautifulSoup'
-    from BeautifulSoup import BeautifulSoup
+from BeautifulSoup import BeautifulSoup
 from difflib import SequenceMatcher, get_close_matches
 from datetime import date
 from credentials import wiki_un, wiki_pw
