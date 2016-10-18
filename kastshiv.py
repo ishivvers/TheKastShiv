@@ -5,8 +5,6 @@ The Kast Shiv: a Kast spectrocscopic reduction pipeline
 
 To Do:
 
-+ add funciton to re-do extraction by object
-+ add how-to in comments
 """
 
 import shivutils as su
@@ -89,7 +87,8 @@ class Shiv(object):
         return self
     
     def next(self, *args, **kwargs):
-        """ Runs the next step in the pipeline.
+        """
+        Runs the next step in the pipeline.
         Any arguments given here are passed along directly
         to the next step.
         """
@@ -108,7 +107,8 @@ class Shiv(object):
         self.summary()
 
     def go_to(self, step=None):
-        """ Go to a specific step in the reduction pipeline.  
+        """
+        Go to a specific step in the reduction pipeline.  
     
         Keyword arguments:
         step -- Integer; if given, goes there, otherwise
@@ -166,7 +166,8 @@ class Shiv(object):
         pickle.dump(vs, open(self.savefile,'w'))
 
     def load(self, savefile=None):
-        """ Loads all self variables from pickled savefile.
+        """
+        Loads all self variables from pickled savefile.
 
         Keyword arguments:
         savefile -- String; path to savefile. If not given, uses default.
@@ -180,7 +181,8 @@ class Shiv(object):
         self.summary()
 
     def build_log(self):
-        """ Performs bookkeeping required to start the log. """
+        """
+        Performs bookkeeping required to start the log. """
         self.log = logging.getLogger('TheKastShiv')
         self.log.setLevel(logging.INFO)
         # have log messages go to screen and to file
@@ -195,7 +197,7 @@ class Shiv(object):
     def summary(self):
         """ Print a summary of the current state of the reduction. """
         print '\n'+'-'*40+'\n'
-        print 'Reduction state for Kast run',self.runID
+        print 'Reduction status for Kast run',self.runID
         print '\n'+'-'*40+'\n'
         try:
             print 'Current step:',self.steps[self.current_step].__name__
@@ -214,7 +216,8 @@ class Shiv(object):
         self.summary()
 
     def run(self, skips=[]):
-        """ Run all steps, in order, until user interaction is required.
+        """
+        Run all steps, in order, until user interaction is required.
 
         Keyword arguments:
         skips -- List of integers; if given, will skip those steps
@@ -227,7 +230,8 @@ class Shiv(object):
                 self.next()
 
     def remove_object(self, objname):
-        """ From here on out, ignore all files associated
+        """
+        From here on out, ignore all files associated
          with given objname.
 
         Arguments:
@@ -258,7 +262,8 @@ class Shiv(object):
         self.log.info('Ignoring all files associated with '+objname)
     
     def build_lists(self, obslog=None):
-        """ Creates the intermediate lists for objects, arcs, and flats.
+        """
+        Creates the intermediate lists for objects, arcs, and flats.
         Must be run at the beginning, and again every time the self.objects/arcs/flats lists are modified.
 
         Keyword arguments:
@@ -276,7 +281,8 @@ class Shiv(object):
         self.barcs = [a for a in self.arcs if a[1]=='b']
 
     def print_list(self, thislist):
-        """ Given a list, print it along with its indices.
+        """
+        Given a list, print it along with its indices.
         
         Arguments:
         thislist -- List you want to enumerate and print.
@@ -300,7 +306,8 @@ class Shiv(object):
         os.chdir( self.runID )
 
     def get_data(self, datePT=None, creds=None):
-        """ Download data and populate relevant folders.
+        """
+        Download data and populate relevant folders.
 
         Should be run from root folder, but then will leave you in working folder.
 
@@ -326,7 +333,8 @@ class Shiv(object):
         os.chdir( '../working' )
 
     def move_data(self, dateUT=None, obslog=None, pagename=None):
-        """ Populates the working directory properly from the rawdata directory.
+        """
+        Populates the working directory properly from the rawdata directory.
         
         Must be run from working directory.
 
@@ -364,7 +372,8 @@ class Shiv(object):
         self.log.info( 'Moved data into working directory; using obslog=%s'%obslog )
 
     def define_lists(self, obslog=None):
-        """ Parses the output of wiki2elog into the formats needed here.
+        """
+        Parses the output of wiki2elog into the formats needed here.
 
         Keyword arguments;
         obslog -- String; if given a obslog path, will use that obslog to build the lists,
@@ -421,7 +430,8 @@ class Shiv(object):
         self.opf = 'cb'  # c for cosmic-ray removal
 
     def rotate_red(self, angle=1.0):
-        """ Rotates the red CCD to correct tilted slit orientation, and
+        """
+        Rotates the red CCD to correct tilted slit orientation, and
         then tranposes the x,y axes to get it aligned as normal (blue to the left).
 
         Keyword arguments:
@@ -438,7 +448,8 @@ class Shiv(object):
         self.log.info('Transposed X,Y for following images:\n'+','.join(reds))
 
     def find_trim_sections(self):
-        """ Determine the optimal trim sections for each side.
+        """
+        Determine the optimal trim sections for each side.
         These sections are saved as self.b_ytrim and self.r_ytrim,
         if you would like to modify them by hand before running self.trim().
         """
@@ -450,7 +461,8 @@ class Shiv(object):
                                                            self.b_ytrim[1], self.r_ytrim[0], self.r_ytrim[0]) )
 
     def trim(self):
-        """ Trims all images in the y dimension, using parameters
+        """
+        Trims all images in the y dimension, using parameters
         self.b_ytrim and self.r_ytrim.
         """
         blues = [self.opf+self.broot%o[0] for o in self.bobjects] +\
@@ -470,7 +482,8 @@ class Shiv(object):
         self.fpf = 'tb'
 
     def update_headers(self):
-        """ Inserts the airmass and optimal PA into the headers for
+        """
+        Inserts the airmass and optimal PA into the headers for
         each image, along with some other header fixes.
         """
         blues = [self.opf+self.broot%o[0] for o in self.bobjects] +\
@@ -483,7 +496,8 @@ class Shiv(object):
         self.log.info('Updated headers of all images')
 
     def make_flats(self, bflat='bflat', rflat='rflat'):
-        """ Makes combined and normalized flats for each side.
+        """
+        Makes combined and normalized flats for each side.
 
         Keyword arguments:
         bflat -- String; name of combined and normalized blue flat file.
@@ -500,7 +514,8 @@ class Shiv(object):
         self.log.info( '\nCreated flat image {}.fits out of the following files:\n'.format(rflat)+','.join(reds) )
 
     def apply_flats(self, bflat=None, rflat=None):
-        """ Applies flatfields to each side.
+        """
+        Applies flatfields to each side.
 
         Keyword arguments:
         bflat: String; path to blue-side flatfile to use. If not given,
@@ -534,7 +549,8 @@ class Shiv(object):
         self.log.info("Estimated seeing for all objects")
 
     def extract_object_spectra(self, side=['red','blue']):
-        """ Extracts the spectra from all objects.  Cannot be run automatically.
+        """
+        Extracts the spectra from all objects.  Cannot be run automatically.
 
         Keyword arguments:
         side -- List of strings or a string; can be one of:
@@ -657,7 +673,8 @@ class Shiv(object):
                 self.save()
 
     def extract_object_special(self, side, iobject, **kwargs):
-        """ Run a special extraction on a file.  Any kwargs given are
+        """
+        Run a special extraction on a file.  Any kwargs given are
         passed along to iraf.apall().
         All possible kwargs are listed on the IRAF page for apall:
         http://stsdas.stsci.edu/cgi-bin/gethelp.cgi?apall.hlp
@@ -697,30 +714,36 @@ class Shiv(object):
             self.extracted_images[1].append( [fname,o[3]] )
 
     def redo_extraction(self, objname, side=['red','blue']):
-        """ Remove images of the object from self.extracted_images list, so
+        """
+        Remove images of the object from self.extracted_images list, so
         that running self.extract_object_spectra() will re-extract all spectra
         of that object.
 
         Arguments:
         objname -- String; exact object name to re-extract.
+                   If given "all", will forget about all objects.
 
         Keyword arguments:
         side -- String or list of strings; Which sides to re-extract.
                 can be one of 'red', 'blue', or ['red','blue'].
         """
-        smap = {'red':0,'blue':1}
-        if type(side) != list:
-            side = list(side)
-        for s in side:
-            i = smap[s]
-            newlist = []
-            for row in self.extracted_images[i]:
-                if row[1] != objname:
-                    newlist.append( row )
-            self.extracted_images[i] = newlist
+        if objname == 'all':
+            self.extracted_images = [[],[]]
+        else:
+            smap = {'red':0,'blue':1}
+            if type(side) != list:
+                side = list(side)
+            for s in side:
+                i = smap[s]
+                newlist = []
+                for row in self.extracted_images[i]:
+                    if row[1] != objname:
+                        newlist.append( row )
+                self.extracted_images[i] = newlist
 
     def splot(self, filename ):
-        """ Use iraf's splot to view a 1D fits file spectrum.
+        """
+        Use iraf's splot to view a 1D fits file spectrum.
         
         Arguments:
         filename -- String; path to file to examine.
@@ -728,7 +751,8 @@ class Shiv(object):
         su.iraf.splot( filename )
 
     def extract_arc_spectra(self, refblue=None, refred=None):
-        """ Extracts the spectra from each arc.
+        """
+        Extracts the spectra from each arc.
 
         Keyword arguments:
         refblue -- String; path to blue-side reference image for defining
@@ -755,7 +779,8 @@ class Shiv(object):
             self.log.info('Extracted red arc spectrum '+redarc+' using '+refred+' as a reference')
 
     def id_arcs(self, combined_red_name='Combined_0.5_Arc.ms.fits'):
-        """ Go through and identify and fit for the lines in all arc files.
+        """
+        Go through and identify and fit for the lines in all arc files.
         Requires human interaction.
 
         Keyword arguments: 
@@ -789,7 +814,8 @@ class Shiv(object):
 
 
     def apply_wavelength(self, force=True):
-        """ Apply the relevant wavelength solution to each object.
+        """
+        Apply the relevant wavelength solution to each object.
 
         Keyword arguments:
         force -- Boolean; if True, will forcibly over-write previously 
@@ -813,7 +839,8 @@ class Shiv(object):
         self.opf = 'dftcb' # d for dispersion-corrected
 
     def flux_calibrate(self, side=None):
-        """ Determine and apply the relevant flux calibration to all objects.
+        """
+        Determine and apply the relevant flux calibration to all objects.
         Uses T.Matheson's IDL code, and requires human interaction.
         Must be run from the working directory, but then leaves the user 
         in the final directory.
@@ -859,7 +886,8 @@ class Shiv(object):
         os.chdir( '../final' )
 
     def coadd_join_output(self, globstr=''):
-        """ Coadds multiple observations of the same science object,
+        """
+        Coadds multiple observations of the same science object,
         joins the red and blue sides of each observation, and then saves
         the result as an ASCII (.flm) file.
         Requires human interaction.
@@ -997,7 +1025,8 @@ class Shiv(object):
             allfiles = [f for f in allfiles if namedate not in f]
 
     def coadd(self, files=None, globstr=None):
-        """ Coadd a set of files.
+        """
+        Coadd a set of files.
 
         Keyword arguments:
         files -- List; if given, will coadd those files.
@@ -1019,7 +1048,8 @@ class Shiv(object):
             return wl,fl,er
 
     def join(self, files=None, globstr=None, ftype='fits', outf=None):
-        """ Join red+blue sides of a set of files.
+        """
+        Join red+blue sides of a set of files.
 
         Keyword arguments:
         files -- List of strings; the files to join together. Must be like: [blue_file, red_file]
@@ -1060,7 +1090,8 @@ class Shiv(object):
             su.plot_spectra( *np.loadtxt(f, unpack=True), title=f, savefile=f.replace('.flm', '.png') )
 
     def plt_flm(self, f):
-        """ Plot the flm file.
+        """
+        Plot the flm file.
 
         Arguments:
         f -- String; path to file (in ascii, .flm format) to plot.
@@ -1068,7 +1099,8 @@ class Shiv(object):
         su.plot_spectra( *np.loadtxt(f, unpack=True), title=f, savefile=f.replace('.flm', '.png') )
 
     def blotch_spectrum(self, f, outf=None):
-        """ Interactively blotch out (i.e. mask) bad regions in a flm file.
+        """
+        Interactively blotch out (i.e. mask) bad regions in a flm file.
         
         Arguments:
         f -- String; path to file (in ascii, .flm format) to blotch.
