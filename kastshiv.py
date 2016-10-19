@@ -5,6 +5,8 @@ The Kast Shiv: a Kast spectrocscopic reduction pipeline
 
 To Do:
 
++ Finish updating the docstrings.
++ Trim the data from the zd run, finish shoving it thru cal.pro
 """
 
 import shivutils as su
@@ -198,6 +200,7 @@ class Shiv(object):
         """ Print a summary of the current state of the reduction. """
         print '\n'+'-'*40+'\n'
         print 'Reduction status for Kast run',self.runID
+        print 'Interactive:',self.interactive
         print '\n'+'-'*40+'\n'
         try:
             print 'Current step:',self.steps[self.current_step].__name__
@@ -580,9 +583,10 @@ class Shiv(object):
                 # give the user some choice here
                 print '\nCurrent image:',fname
                 print 'Object:', o[-1]
-                inn = raw_input('\nView image with ds9? [y/n](n):\n')
-                if 'y' in inn.lower():
-                    os.system('ds9 -scale log -geometry 1200x600 %s &' %fname)
+                # inn = raw_input('\nView image with ds9? [y/n](n):\n')
+                # if 'y' in inn.lower():
+                    # os.system('ds9 -scale log -geometry 1200x600 %s &' %fname)
+                os.system('ds9 -scale zscale -geometry 1200x600 %s &' %fname)
                 for iref in irefs:
                     reference = self.extracted_images[0][iref]
                     print
@@ -628,9 +632,10 @@ class Shiv(object):
                 # give the user some choice here
                 print '\nCurrent image:',fname
                 print 'Object:', o[-1]
-                inn = raw_input('\nView image with ds9? [y/n](n):\n')
-                if 'y' in inn.lower():
-                    os.system('ds9 -scale log -geometry 1200x600 -zoom 0.6 %s &' %fname)
+                # inn = raw_input('\nView image with ds9? [y/n](n):\n')
+                # if 'y' in inn.lower():
+                    # os.system('ds9 -scale log -geometry 1200x600 -zoom 0.6 %s &' %fname)
+                os.system('ds9 -scale zscale -geometry 1200x600 -zoom 0.6 %s &' %fname)
                 blueref = False
                 # choose from blue references first
                 for iref in blue_irefs:
