@@ -20,7 +20,7 @@ http://ssb.stsci.edu/ureka/
 # imports
 ######################################################################
 
-# installed
+# installed system-wide
 import numpy as np
 import matplotlib.pyplot as plt
 import pyfits as pf
@@ -37,7 +37,7 @@ import urllib
 import os
 import re
 
-# local
+# local to TheKastShiv
 from tools import cosmics as cr
 from tools import credentials
 from tools import check_log
@@ -89,7 +89,8 @@ INDEF=iraf.INDEF
 ############################################################################
 
 def make_file_system( runID ):
-    """ Creates the file system heirarchy for kast reductions. 
+    """
+    Creates the file system heirarchy for kast reductions. 
     Uses the location the command was run from as a root.
 
     Arguments:
@@ -107,8 +108,9 @@ def make_file_system( runID ):
 ############################################################################
 
 def populate_working_dir( runID, logfile=None, all_obs=None ):
-    """ Take the unpacked data from the raw directory, rename files as necessary,
-     and move them into the working directory.
+    """
+    Take the unpacked data from the raw directory, rename files as necessary,
+    and move them into the working directory.
     Should be run from working directory.
 
     Arguments: 
@@ -149,7 +151,8 @@ def populate_working_dir( runID, logfile=None, all_obs=None ):
 ######################################################################
 
 def run_cmd( cmd, ignore_errors=False ):
-    """ Wrapper for running external commands.
+    """
+    Wrapper for running external commands.
 
     Arguments:
     cmd -- String; UNIX command to run.
@@ -165,7 +168,8 @@ def run_cmd( cmd, ignore_errors=False ):
 ############################################################################
 
 def start_idl( idlpath=IDLPATH ):
-    """ Start an interactive IDL session and put the
+    """
+    Start an interactive IDL session and put the
     user into it.
     
     Keyword arguments:
@@ -183,7 +187,8 @@ def start_idl( idlpath=IDLPATH ):
 
 def get_kast_data( datestring, outfile=None, unpack=True, override_files=False,
                    un=credentials.repository_un, pw=credentials.repository_pw ):
-    """ Download kast data.
+    """
+    Download kast data.
 
     Arguments:
     datestring -- String; the date (in Pacific Time) of the night of the run.
@@ -216,7 +221,8 @@ def get_kast_data( datestring, outfile=None, unpack=True, override_files=False,
 
 def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None, infile=None,
                un=credentials.wiki_un, pw=credentials.wiki_pw ):
-    """ Take a wiki page or a obslog file and return formatted
+    """
+    Take a wiki page or a obslog file and return formatted
     lists of objects, arcs, and flats.
 
     Keyword arguments:
@@ -228,7 +234,7 @@ def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None, infile=
     un -- String; username for data repository.
     pw -- String; password for data repository.
 
-    If given infile, will parse that logfile (Shivvers format, updated in Fall 2016).
+    If given infile, will parse that logfile.
     If not given infile, must be given pagename OR (runID and datestring),
      and this script will download and parse the log from the wiki page.
     """
@@ -254,7 +260,8 @@ def wiki2elog( datestring=None, runID=None, pagename=None, outfile=None, infile=
 ############################################################################
 
 def head_get( image, keywords ):
-    ''' Get given keywords from the given fits image.
+    '''
+    Get given keywords from the given fits image.
 
     Arguments:
     image -- String; path to image to pull header info from.
@@ -272,7 +279,8 @@ def head_get( image, keywords ):
 ############################################################################
 
 def head_del( images, keywords ):
-    ''' Remove given keywords from fits images.
+    '''
+    Remove given keywords from fits images.
 
     Arguments:
     image -- String; path to image to delete header info from.
@@ -292,7 +300,8 @@ def head_del( images, keywords ):
 ############################################################################
 
 def head_update( images, keywords, values, comment=None ):
-    """ Update (or set) given keywords to given values.
+    """
+    Update (or set) given keywords to given values.
 
     Arguments:
     images -- String or list of strings; images of which to update the headers.
@@ -364,7 +373,8 @@ def transpose(images, prefix=None):
 ############################################################################
 
 def overscan_bias_correct(images, prefix=None):
-    """ Bias corrects images using overscanLickObs.py by E.Gates.
+    """
+    Bias corrects images using overscanLickObs.py by E.Gates.
     Handles both blue-side and red-side images appropriately.
 
     Arguments:
@@ -380,7 +390,8 @@ def overscan_bias_correct(images, prefix=None):
         overscan_bias( [image], [prefix+image] )
 
 def trim(images, y1=None, y2=None, x1=None, x2=None, prefix=None):
-    """ Trims images.
+    """
+    Trims images.
 
     Keyword arguments:
     y1 -- Int; lower y boundary.
@@ -418,8 +429,9 @@ def trim(images, y1=None, y2=None, x1=None, x2=None, prefix=None):
 ############################################################################
 
 def make_flat(images, outflat, side, interactive=True):
-    """ Construct median flat from individual frames, and then
-     normalize by fitting a response function.
+    """
+    Construct median flat from individual frames, and then
+    normalize by fitting a response function.
 
     Arguments:
     images -- List of strings; paths to images to construct flat from.
@@ -461,7 +473,13 @@ def make_flat(images, outflat, side, interactive=True):
 def apply_flat(images, flat, prefix='f' ):
     """
     Apply flatfield correction to images.
-    - prefix defaults to 'f' if not given
+
+    Arguments:
+    images -- List of strings; paths to images to get flatfielded.
+    flat -- String; path to flatfield image.
+
+    Keyword arguments:
+    prefix -- String; will pre-pend any given string to output files.
     """
     for image in images:
         iraf.ccdproc(image, output='%s%s' %(prefix,image),
@@ -474,7 +492,14 @@ def apply_flat(images, flat, prefix='f' ):
 
 def update_headers(images, reducer=None):
     """
-    Run fixhead (custom IRAF task) and calculate the airmass values.
+    Run fixhead (custom IRAF task) to insert calculated airmasses into header
+    and do some other things.
+
+    Arguments:
+    images -- List of strings; paths to images to get fixed.
+    
+    Keyword arguments:
+    reduce -- String; name of the reducer, which will be written into the header.
     """
     for image in images:
         iraf.kastfixhead(image)
@@ -487,9 +512,15 @@ def update_headers(images, reducer=None):
 def calculate_seeing( allfiles, plot=False ):
     """
     Given a list of files, will find the standards from them and calculate the seeing
-     and observation time of each.
+    and observation time of each.
     The seeing observed nearest the time of each object observation will then be calculated
-     and inserted into the header.
+    and inserted into the header.
+
+    Arguments:
+    allfiles -- List of strings; paths to files of all object (science + standard) observations.
+    
+    Keyword arguments:
+    plot -- Boolean; show plots of fitted Gaussians to spatial extent of trace.
     """
     std_times, std_seeing = [], []
     # calculate the seeing for each standard
@@ -533,7 +564,10 @@ def calculate_seeing( allfiles, plot=False ):
 
 def combine_arcs( arcs, output ):
     """
-    simply combine a set of arc images into a single image
+    Combine two arc images into a single image.
+
+    Arguments:
+    arcs -- List of strings; should be [arc_1, arc_2]
     """
     # make sure the file doesn't already exist
     try:
@@ -546,10 +580,17 @@ def combine_arcs( arcs, output ):
 ############################################################################
 
 def id_arc(arc, side='b', coordlist=COORDLIST):
-
-    '''
+    """
     Construct reference wavelength solution from arc lamps
-    '''
+    
+    Arguments:
+    arc -- String; path to arc file to ID.
+    
+    Keyword arguments:
+    side -- String; one of 'b','r' for blue or red, respectively.
+    coordlist -- String; path to the linelist.dat file, which includes
+                 the wavelengths of all lines to use (in IRAF format).
+    """
     if side == 'r':
         order = 6
     elif side == 'b':
@@ -564,14 +605,21 @@ def id_arc(arc, side='b', coordlist=COORDLIST):
 ############################################################################
 
 def reid_arc(arc, reference, coordlist=COORDLIST):
-    '''
-    Construct wavelength solution from arc lamp,
-     using previous extraction as a guide.
+    """
+    Construct wavelength solution from arc lamp, using previous extraction as a guide.
+
+    Arguments:
+    arc -- String; path to arc file to id.
+    reference -- String; path to previously-identified arc file to use as a reference.
+    
+    Keyword arguments:
+    coordlist -- String; path to the linelist.dat file, which includes
+                 the wavelengths of all lines to use (in IRAF format).
     If any additional kwargs are given, they are passed onto iraf.reidentify().
-     For example, this is often useful:
+    For example, this is often useful:
        override=ks.yes
-       (http://stsdas.stsci.edu/cgi-bin/gethelp.cgi?reidentify lists all options)
-    '''
+       (for more options, see http://stsdas.stsci.edu/cgi-bin/gethelp.cgi?reidentify)
+    """
     while True:
         print 'arc:',arc
         print 'reference:',reference
@@ -590,6 +638,13 @@ def reid_arc(arc, reference, coordlist=COORDLIST):
 def disp_correct( image, arc, prefix='d' ):
     """
     Apply the wavelength solution from arc to image.
+    
+    Arguments:
+    image -- String; path to image to dispersion correct.
+    arc -- String; path to arclamp to use to define dispersion function.
+    
+    Keyword arguments:
+    prefix -- String; prefix to prepend to image filename to create output file.
     """
     # define the reference spectrum header in our science object
     head_update( image, 'REFSPEC1', arc )
@@ -602,9 +657,12 @@ def disp_correct( image, arc, prefix='d' ):
 def parse_apfile( apfile ):
     """
     Open an iraf.apall apfile and search for and pull out the background and
-     aperture properties.
+    aperture properties.
     Returns a tuple of (lo, hi) for aperture, low background, and high background, in that order
      e.g.: aperture, lo_bg, hi_bg = parse_apfile( apfile )
+    
+    Arguments:
+    apfile -- String; path to apfile to parse.
     """
     lines = open(apfile,'r').readlines()
     lo = float([l for l in lines if 'low' in l][0].split(' ')[-1].strip())
@@ -620,23 +678,39 @@ def extract( image, side, arc=False, interact=True, reference=None, trace_only=F
     """
     Use apall to extract the spectrum.
     
-    If arc=True, will not fit for or subtract a background, and you must include a reference.
-    If this is part of a set of consecutive observations of the same object, and is not
-     the first, pass along the extracted first observation as 'reference';
-     this will force interact=False and will use all of the parameters from the reference.
-    If 'reference' is given and trace_only is True, will only use the reference to define the
-     trace pattern, and not the aperture.  This is useful for extracting nebular spectra,
-     when you can pass an image of the standard star along as a reference to define the trace.
-     If 'reference' is not given, trace_only is ignored.
-    If apfile is given, will use the aperture and background properties from that apfile,
-     first multiplying by apfact if given (accounts for pixel size differences).
-     Note: using either arc or reference keys will override the apfile.
+    Arguments: 
+    image -- String; path to file from which to extract a spectrum.
+    side -- String; one of 'red', 'blue'
+
+    Keyword arguments:
+    arc -- Boolean; if true, will assume <image> is an arclamp observation, and
+           will not fit for or subtract a background; you must include a reference.
+    interact -- Boolean; should the user interact with the process?
+    reference -- String; if is given and trace_only is True, will simply use the reference to define the
+                 trace pattern, and not the aperture.  This is useful for extracting nebular spectra,
+                 when you can pass an image of the standard star along as a reference to define the trace.
+                 If 'reference' is not given, trace_only is ignored.
+                 Also required if arc == True.
+    trace_only -- Boolean; if True, will only use reference for defining the trace pattern,
+                  not for definining the aperature, et cetera.   
+    apfile -- String; path to apfile to use to define the aperture and background properties.
+               If given, will use the aperture and background properties from that apfile,
+               first multiplying by apfact if given (accounts for pixel size differences).
+               Note: using either arc or reference keys will override the apfile.
+    apfact -- Float; the difference in spatial scale between pixels on the red side
+              versus the blue. Used to define the size & scale of the blue-side aperture and
+              background given a red-side image as a reference.
+
     Any additional keyword arguments will be passed along to iraf.apall directly, overriding any built-in defaults. 
      Common keywords include:
      - line: the column number to use to define the aperture (helpful for nebular spectra)
      - nsum: the number of adjacent columns to sum (or median, if nsum<0) to define the aperture
      - output: if not given, follows IRAF standard and sticks ".ms." in middle of filename (for "multispec").
-     See here for an exhaustive list: http://iraf.net/irafhelp.php?val=apextract.apall&help=Help+Page
+    See here for an exhaustive list: http://iraf.net/irafhelp.php?val=apextract.apall&help=Help+Page
+
+    If this is part of a set of consecutive observations of the same object, and is not
+    the first, pass along the extracted first observation as 'reference';
+    this will force interact=False and will use all of the parameters from the reference.
     """
     
     if interact:
@@ -787,12 +861,16 @@ def extract( image, side, arc=False, interact=True, reference=None, trace_only=F
 
 def clean_cosmics( fitspath, side, cleanpath=None, maskpath=None, plot=False ):
     """
-     clean an input fits file using the LACOS algorithm 
+    Clean an input fits file using the L.A.Cosmic algorithm 
     
-    - fitspath: input file
-    - side: one of 'blue','red'
-    - cleanpath: output file (if none, prepends "c" to input filename)
-    - maskpath: [optional] mask output file
+    Arguments:
+    fitspath -- String; path to input file to get cleaned.
+    side -- String; one of 'red', 'blue'
+    
+    Keyword arguments:
+    cleanpath -- String; path to  output file. (If none, prepends "c" to input filename)
+    maskpath -- String; path to mask output file.
+    plot -- Boolean; if True, shows diagnostic plots showing CR removal.
     """
     if cleanpath == None:
         # this only works if we are in the same folder
@@ -855,10 +933,13 @@ def clean_cosmics( fitspath, side, cleanpath=None, maskpath=None, plot=False ):
 
 def id_standard( obj_name ):
     """
-    Matches obj_name (a string) to known red and blue standards.
+    Matches object name to known red and blue standards.
     Returns None if not a standard, returns (name, side) if it is
      (where side = 1 for blue and 2 for red)
     The IDL script abcalc.pro must know about all of these objects!
+
+    Arguments:
+    obj_name -- String; name of object.
     """
     # name, side (1=blue, 2=red)
     standards = {'feige34': 1, 'feige110' : 1, 'hz44' : 1, 
@@ -882,11 +963,14 @@ def id_standard( obj_name ):
 def match_science_and_standards( allobjects ):
     """
     Takes in a list of the filenames for all observed objects, identifies the 
-     standard star observations, and associates each object
-     with the standard taken at the closest airmass.
+    standard star observations, and associates each object
+    with the standard taken at the closest airmass.
     Returns a dictionary for each side (blue, red) with the standard observations 
-     as the keys and a list of associated science observations as
-     the values.
+    as the keys and a list of associated science observations as
+    the values.
+    
+    Arguments:
+    allobjects -- List of strings; filenames for all observed objects (standards + science).
     """
     blue_outdict = {}
     red_outdict = {}
@@ -959,13 +1043,20 @@ def match_science_and_standards( allobjects ):
 # calibrating and finishing
 ############################################################################
 
-def calibrate_idl( input_dict, idlpath=IDLPATH, cleanup=True ):
+def calibrate_idl( input_dict, idlpath=IDLPATH ):
     """
     Runs the idl task cal.pro on the files given in the input_dict.
-     input_dict should have standard observations for keys and lists of
-     associated science observations as values.
+    input_dict should have standard observations for keys and lists of
+    associated science observations as values.
+
     Should be run from final folder, though the input images should 
-     all live in the working folder.
+    all live in the working folder.
+    
+    Arguments:
+    input_dict -- Dictionary; output of match_science_and_standards
+    
+    Keyword arguments:
+    idlpath -- String; path to IDL executable
     """
     for std in input_dict.keys():
         # create an input file
@@ -992,7 +1083,10 @@ def calibrate_idl( input_dict, idlpath=IDLPATH, cleanup=True ):
 def read_calfits( f ):
     """
     Reads in a fits file produced by cal.pro, returns wl,fl,er
-     numpy arrays.
+    numpy arrays.
+    
+    Arguments:
+    f -- String; path to calibrated fits file to read in.
     """
     hdu = pf.open( f )
     wlmin = hdu[0].header['crval1']
@@ -1008,15 +1102,22 @@ def read_calfits( f ):
 def coadd( files, save=True, fname=None ):
     """
     Reads in a list of fits file names (file formats as expected from flux-calibrated
-     spectra, after using the IDL routine cal.pro).
+    spectra, after using the IDL routine cal.pro).
     Converts all input specta into units of [flux * time], adds them, and then divides
-     by the total time to return a spectrum in units of [flux].  If the wavelength 
-     arrays are different will interpolate all spectra onto the region covered
-     by all input spectra, rebinning all data to the same resolution first if needed
-     (using the resolution of the lowest-resolution spectrum).
-    If save is True, will save a fits file of the coadded input fits files, with a 
-     properly-updated header.
+    by the total time to return a spectrum in units of [flux].  If the wavelength 
+    arrays are different will interpolate all spectra onto the region covered
+    by all input spectra, rebinning all data to the same resolution first if needed
+    (using the resolution of the lowest-resolution spectrum).
     Returns numpy arrays of wavelength, flux, and error.
+   
+    Arguments:
+    files -- List of strings; paths to input files to coadd.
+    
+    Keyword arguments:
+    save -- Boolean; if True, will save a fits file of the coadded input fits files, with a 
+            properly-updated header.
+    fname -- String; if save == True, will save output file with this name.
+             If not given, will prepend 'coadded.' to the input file name.
     """
     hdus = [pf.open(f) for f in files]
     res = max( [h[0].header['cdelt1'] for h in hdus] )
@@ -1089,10 +1190,18 @@ def coadd( files, save=True, fname=None ):
 
 def join( spec1, spec2, scaleside=1, interactive=True ):
     """
-    Used to join the red and blue sides of Kast, or a similar spectrograph.
-    Each of spec1,2 should be a list of [wl, fl, er] (er is optional),
-     and spec1 must be the bluer spectrum.
-    Scaleside lets you choose between rescaling side 1 or side 2.
+    Join the red and blue sides of Kast, or a similar spectrograph.
+    and spec1 must be the bluer spectrum.
+
+    Arguments:
+    spec1 -- List of arrays; definition of blue-side spectrum,
+             I.E. [wavelength, flux, error] (error is optional).
+    spec2 -- List of arrays; definition of red-side spectrum,
+             I.E. [wavelength, flux, error] (error is optional).
+
+    Keyword arguments:
+    scaleside -- Int; index of side to rescale when matching sides.
+    interactive -- Boolean; whether to ask user to define the overlap region.
     """
     # calculate the overlap masks
     m1 = spec1[0] >= spec2[0][0]
@@ -1143,9 +1252,18 @@ def join( spec1, spec2, scaleside=1, interactive=True ):
 def np2flm( fname, wl,fl, er=None, blotch=None, headerstring='' ):
     """
     Saves numpy arrays of wavelength and flux into the 
-     Flipper-standard ascii *.flm file.
-    If given a blotch vector (of booleans) will comment out the
-     blotched regions with an #
+    Flipper-standard ascii *.flm file.
+
+    Arguments:
+    fname -- String; name to give to new file.
+    wl -- Array of floats; wavelength (Angstrom).
+    fl -- Array of floats; flux (F_lambda).
+    
+    Keyword arguments:
+    er -- Array of floats; error (F_lambda).
+    blotch -- Array of booleans; mask to use to comment out
+              blotched regions with an # in the output file.
+    headerstring -- String; prepended to beginning of file.
     """
     if blotch == None:
         blotch = np.zeros_like( wl )
@@ -1170,10 +1288,6 @@ def np2flm( fname, wl,fl, er=None, blotch=None, headerstring='' ):
 ######################################################################
 
 def tophat(x, low, high, left, right):
-    """
-    Returns a tophat with left, right for x-value edges, and
-     low,high for y-value limits
-    """
     y = np.zeros_like(x)
     y[ (x<=left) | (x>=right) ] = low
     y[ (x>left) & (x<right) ] = high
@@ -1190,7 +1304,13 @@ def sumsqerr(p, x, y):
 def find_trim_sec( flatfile, edgebuf=10, plot=True ):
     """
     Find the optimal y-axis trim values from flatfile.
-     edge: the size of the edge buffer in pixels
+
+    Arguments:
+    flatfile -- String; path to file to use (flat image).
+
+    Keyword arguments:
+    edgebuf -- Int; size of the edge buffer used, in pixels.
+    plot -- Boolean; if True, shows diagnostic plots.
     """
     data = pf.open(flatfile)[0].data
     # find the best column to examine by choosing the peak of
@@ -1246,13 +1366,15 @@ def find_trim_sec( flatfile, edgebuf=10, plot=True ):
 def plot_spectra(lam, flam, err=None, title=None, savefile=None):
     '''
     Produce pretty spectra plots.
-    
-    lam: wavelength
-    flam: flux
-    err: error spectrum
-     (all three must be 1d and array-like)
-    title: if given, will place as the title of the plot
-    savefile: if given, will save the plot to that file.
+   
+    Arguments: 
+    lam -- Array of floats; the wavelength array (Angstrom).
+    flam -- Array of floats; the flux array (F_lambda).
+
+    Keyword arguments:
+    err -- Array of floats; the error spectrum array (F_lambda).
+    title -- String; if given, will place this string as the title of the plot.
+    savefile -- String; if given, will save the plot to that filename.
     '''
         
     spec_kwargs = dict( alpha=1., linewidth=1, c=(30./256, 60./256, 75./256) )
@@ -1275,13 +1397,17 @@ def plot_spectra(lam, flam, err=None, title=None, savefile=None):
     plt.show()
 
 def blotch_spectrum( fname, outfname=None ):
-    '''
-    Interactively fix bad pixels and blotch out
-     bad regions, et cetera.
+    """
+    Interactively fix bad pixels and blotch/mask out bad regions.
+    Any bad regions identified are commented out in the ascii file
+    with a hash (#).
 
-    fname: path to *.flm file
-    outfname: path to savefile. If not given, overwrites original.
-    '''
+    Arguments:
+    fname -- String; path to ascii spectrum file (.flm) to be blotched.
+
+    Keyword arguments:
+    outfname -- String; path to save result. If not given, overwrites original.
+    """
     if outfname == None:
         outfname = fname
 
@@ -1308,4 +1434,4 @@ def blotch_spectrum( fname, outfname=None ):
             blotch[m] = 1
             blotchlines.append( plt.plot( d[:,0][m], d[:,1][m], 'r', lw=2 )[0] )
             plt.draw()
-    
+ 
