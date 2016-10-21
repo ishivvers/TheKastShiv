@@ -879,12 +879,17 @@ def clean_cosmics( fitspath, side, cleanpath=None, maskpath=None, plot=False ):
     # lacos parameters
     if side == 'red':
         gain = REDGAIN
-        rdnoise = REDRDNOISE
-        sigclip = 6.0
-        sigfrac = 0.5
-        maxiter = 5
-        objlim = 3.0
-        satlevel = 50000
+        rdnoise = REDRDNOISE # BELOW RULES OF THUM ARE FROM COSMICS DOCSTRING:
+        sigclip = 6.0 # Increase this if you detect cosmics where there are none.
+                      #  Default is 5.0, a good value for earth-bound images.
+        sigfrac = 1.0 # Increase this if normal stars are detected as cosmics.
+                      #  Default is 5.0, a good value for earth-bound images.
+        maxiter = 7   # Max number of iterations.
+        objlim = 2.0  # Contrast limit between CR and underlying object
+        satlevel = -1  # If we find agglomerations of pixels above this level, 
+                       #  we consider it to be a saturated star and
+                       #  do not try to correct it and the pixels around it.
+                       #  A negative satlevel skips this feature.
     elif side == 'blue':
         gain = BLUEGAIN1
         rdnoise = BLUERDNOISE
@@ -892,7 +897,7 @@ def clean_cosmics( fitspath, side, cleanpath=None, maskpath=None, plot=False ):
         sigfrac = 3.0
         maxiter = 3
         objlim = 2.0
-        satlevel = 50000
+        satlevel = -1
     
     array, header = cr.fromfits(fitspath)
     c = cr.cosmicsimage(array, gain=gain, readnoise=rdnoise, satlevel=satlevel,
