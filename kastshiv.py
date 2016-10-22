@@ -452,7 +452,7 @@ class Shiv(object):
 
     def find_trim_sections(self):
         """
-        Determine the optimal trim sections for each side.
+        Determine the optimal trim sections for each side (in the Y dimension).
         These sections are saved as self.b_ytrim and self.r_ytrim,
         if you would like to modify them by hand before running self.trim().
         """

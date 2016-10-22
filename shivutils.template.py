@@ -441,11 +441,17 @@ def make_flat(images, outflat, side, interactive=True):
     if side == 'red':
         gain = REDGAIN
         rdnoise = REDRDNOISE
-        fitorder = 18
+        fitorder = 30
+        low_reject = 3.0
+        high_reject = 0.0 
+        niterate = 3
     elif side == 'blue':
         gain = BLUEGAIN1
         rdnoise = BLUERDNOISE
         fitorder = 6
+        low_reject = 0.0
+        high_reject = 0.0
+        niterate = 0
     else:
         raise StandardError( "side must be one of 'red','blue'" )
     
@@ -463,10 +469,12 @@ def make_flat(images, outflat, side, interactive=True):
         pass
     iraf.flatcombine(flatimages, output='CombinedFlat', combine='median',
                      reject='ccdclip', ccdtype='', process=no, subsets=no,
-                     delete=no, scale='median', lsigma=3.0,
-                     hsigma=3.0, gain=gain, rdnoise=rdnoise)
+                     delete=no, scale='median', lsigma=3, hsigma=3,
+                     gain=gain, rdnoise=rdnoise)
     # fit for the response function and save as the output
-    iraf.response('CombinedFlat', 'CombinedFlat', outflat, order=fitorder, interactive=interact)
+    iraf.response('CombinedFlat', 'CombinedFlat', outflat,
+                   low_reject=low_reject, high_reject=high_reject, niterate=niterate,
+                   order=fitorder, interactive=interact)
 
 ############################################################################
 
