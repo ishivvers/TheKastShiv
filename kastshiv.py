@@ -3,10 +3,6 @@ The Kast Shiv: a Kast spectrocscopic reduction pipeline
  written by I.Shivvers (modified from the K.Clubb/J.Silverman/R.Foley/R.Chornock/T.Matheson
  pipeline and the B.Cenko pipeline - thanks everyone).
 
-To Do:
-
-+ Finish updating the docstrings.
-+ Trim the data from the zd run, finish shoving it thru cal.pro
 """
 
 import shivutils as su
@@ -55,13 +51,6 @@ class Shiv(object):
         else:
             self.parallel = False
 
-        # set up the logfile
-        if logfile == None:
-            self.logfile = os.path.abspath('.') + '/' + self.runID+'.reduction.log'
-        else:
-            self.logfile = logfile
-        self.build_log()
-
         self.steps = [self.build_fs,
                       self.get_data,
                       self.move_data,
@@ -84,6 +73,20 @@ class Shiv(object):
         self.current_step = 0
 
         self.extracted_images = [[],[]]  #[red,blue]; used to keep track of multiple observations of the same object
+
+        # load from savefile, if it exists locally
+        if os.path.exists( self.savefile ):
+            inn = raw_input('Load saved state from {}? (y/n)[y]\n'.format(self.savefile) )
+            if 'n' not in inn.lower():
+                self.load()
+
+        # set up the logfile
+        if logfile == None:
+            self.logfile = os.path.abspath('.') + '/' + self.runID+'.reduction.log'
+        else:
+            self.logfile = logfile
+        self.build_log()
+
 
     def __iter__(self):
         return self
