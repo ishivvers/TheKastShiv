@@ -192,6 +192,9 @@ def wiki2log( pagename, outfile=None ):
         elif obstype == 'flat':
             for on in obsnums:
                 flats.append( [on, side, obstype] )
+        elif obstype == 'bias':
+            print 'Found bias files, ignoring for now!'
+            continue
         else:
             raise StandardError('Error reading log!')
 

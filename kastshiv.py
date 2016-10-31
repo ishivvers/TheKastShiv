@@ -49,7 +49,7 @@ class Shiv(object):
         if PARALLEL and parallel:
             self.parallel = True
         else:
-            self.parallel = False
+            self.parallel = False 
 
         self.steps = [self.build_fs,
                       self.get_data,
@@ -206,13 +206,13 @@ class Shiv(object):
         print 'Interactive:',self.interactive
         print '\n'+'-'*40+'\n'
         try:
-            print 'Current step:',self.steps[self.current_step].__name__
+            print 'Next step:',self.steps[self.current_step].__name__
             print self.steps[self.current_step].__doc__
         except IndexError:
             print 'End of reduction pipeline.'
             return
         try:
-            print '\nNext step:',self.steps[self.current_step+1].__name__
+            print 'Subsequent:',self.steps[self.current_step+1].__name__
             print self.steps[self.current_step+1].__doc__
         except IndexError:
             print 'End of reduction pipeline.'
