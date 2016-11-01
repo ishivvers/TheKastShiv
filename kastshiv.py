@@ -212,6 +212,7 @@ class Shiv(object):
             print 'End of reduction pipeline.'
             return
         try:
+            print '\n'
             print 'Subsequent:',self.steps[self.current_step+1].__name__
             print self.steps[self.current_step+1].__doc__
         except IndexError:
@@ -900,6 +901,8 @@ class Shiv(object):
         the result as an ASCII (.flm) file.
         Requires human interaction.
 
+        Must be run from final folder.
+
         Keyword arguments:
         globstr -- String; If given, only processes files that include that
                    glob string (example: glob='sn2014ds').
@@ -952,29 +955,7 @@ class Shiv(object):
             # find all the blues, and coadd them
             bluematches = glob( namedate + '*' + 'uv.ms.fits' )
             if len(bluematches) > 1:
-                inn = raw_input( 'Combine the following files: \n'+str(bluematches)+'? [y/n] (y):\n' )
-                if 'n' not in inn:
-                    # need to update the filename to show that it was averaged
-                    # assumes that all were observed on the same day
-                    f_timestr = re.search( '\.\d{3}', fblue ).group()
-                    avg_time = np.mean( [float(re.search('\.\d{3}', fff).group()) for fff in bluematches] )
-                    new_timestr = ('%.3f'%avg_time)[1:] #drop the leading 0
-                    fblue = fblue.replace( f_timestr, new_timestr )
-                    blue = list(su.coadd( bluematches, fname=fblue ))
-                    self.log.info( 'Coadded the following files: '+str(bluematches))
-                else:
-                    print 'Choose which file you want:'
-                    for i,f in enumerate(bluematches): print i,':::',f
-                    inn = raw_input('Enter a number, or q to quit\n')
-                    if 'q' in inn:
-                        continue
-                    else:
-                        try:
-                            fblue = bluematches[int(inn)]
-                            blue = list(su.read_calfits( fblue ))
-                        except ValueError:
-                            print '\nWhat?\n'
-                            continue
+                blue, fblue = self.coadd( files=bluematches )
             elif len(bluematches) == 1:
                 fblue = bluematches[0]
                 blue = list(su.read_calfits( fblue ))
@@ -984,29 +965,7 @@ class Shiv(object):
             # find all the reds, and coadd them
             redmatches = glob( namedate + '*' + 'ir.ms.fits' )
             if len(redmatches) > 1:
-                inn = raw_input( 'Combine the following files: \n'+str(redmatches)+'? [y/n] (y):\n' )
-                if 'n' not in inn:
-                    # need to update the filename to show that it was averaged
-                    # assumes that all were observed on the same day
-                    f_timestr = re.search( '\.\d{3}', fred ).group()
-                    avg_time = np.mean( [float(re.search('\.\d{3}', fff).group()) for fff in redmatches] )
-                    new_timestr = ('%.3f'%avg_time)[1:] #drop the leading 0
-                    fred = fred.replace( f_timestr, new_timestr )
-                    red = list(su.coadd( redmatches, fname=fred ))
-                    self.log.info( 'Coadded the following files: '+str(redmatches))
-                else:
-                    print 'Choose which file you want:'
-                    for i,f in enumerate(redmatches): print i,':::',f
-                    inn = raw_input('Enter a number, or q to quit\n')
-                    if 'q' in inn:
-                        continue
-                    else:
-                        try:
-                            fred = redmatches[int(inn)]
-                            red = list(su.read_calfits( fred ))
-                        except ValueError:
-                            print '\nWhat?\n'
-                            continue
+                red, fred = self.coadd( files=redmatches )
             elif len(redmatches) == 1:
                 fred = redmatches[0] 
                 red = list(su.read_calfits( fred ))
@@ -1032,28 +991,36 @@ class Shiv(object):
             # only drop from the list if we got all the way through and successfully saved it
             allfiles = [f for f in allfiles if namedate not in f]
 
+    ################################################
+    # helper functions 
+    ################################################
     def coadd(self, files=None, globstr=None):
         """
-        Coadd a set of files.
+        Coadd a set of files with median outlier
+        rejection, as in the pipeline.
 
         Keyword arguments:
         files -- List; if given, will coadd those files.
-        globstr -- String; if given, will coadd all files
-                   with filenames that match the string.
+        globstr -- String; if given, and files is not,
+                   will coadd all files with filenames
+                   that match the string.
         """
-        if 'globstr' != None:
+        if (files == None) and (globstr != None):
             files = glob('*'+globstr+'*')
         
         inn = raw_input('\n Co-add the following files? \n'+str(files)+\
                          '\n [y/n] (y):\n')
         if 'n' not in inn.lower():
+            # need to update the filename to show that it was averaged
+            # assumes that all were observed on the same day
             f_timestr = re.search( '\.\d{3}', files[0] ).group()
             avg_time = np.mean( [float(re.search('\.\d{3}', fff).group()) for fff in files] )
             new_timestr = ('%.3f'%avg_time)[1:] #drop the leading 0
+            new_timestr = new_timestr + '.coadd'
             fname = files[0].replace( f_timestr, new_timestr )
-            wl,fl,er = su.coadd( files, fname=fname )
+            coadded = list( su.median_combine( files, fname=fname ) )
             self.log.info( 'Co-addition of %s saved to file %s'%(str(files), fname) )
-            return wl,fl,er
+            return coadded, fname
 
     def join(self, files=None, globstr=None, ftype='fits', outf=None):
         """
