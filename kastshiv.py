@@ -127,7 +127,11 @@ class Shiv(object):
             print '\nChoose one:'
             for i,s in enumerate(self.steps):
                 print i,':::',s.__name__
-            self.current_step = int(raw_input())
+            print 'q ::: quit'
+            try:
+                self.current_step = int(raw_input())
+            except ValueError:
+                return
             self.summary()
         # handle the prefixes properly
         if self.current_step <= self.steps.index( self.bias_correct ):
