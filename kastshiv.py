@@ -808,7 +808,7 @@ class Shiv(object):
             raise Exception('Found more than one blue arc image!')
         inn = raw_input('\nView the blue arc lamp reference image? (y/n)[y]\n')
         if 'n' not in inn.lower():
-            su.run_cmd( 'xdg-open %s'%su.BLUEARCIMG, ignore_errors=True )
+            su.run_cmd( 'open %s'%su.BLUEARCIMG, ignore_errors=True )
         
         self.bluearc = bluearcs[0]
         su.id_arc( self.bluearc, side='b' )
@@ -820,7 +820,7 @@ class Shiv(object):
         self.log.info( "Created {} from {}".format(combined_red_name,R1R2) )
         inn = raw_input('\nView the red arc lamp reference image? (y/n)[y]\n')
         if 'n' not in inn.lower():
-            su.run_cmd( 'xdg-open %s'%su.REDARCIMG, ignore_errors=True )
+            su.run_cmd( 'open %s'%su.REDARCIMG, ignore_errors=True )
         self.redarc = combined_red_name
         su.id_arc( self.redarc, side='r' )
         self.log.info("Successfully ID'd arc lamp lines from "+self.redarc)
