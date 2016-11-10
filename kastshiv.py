@@ -578,7 +578,7 @@ class Shiv(object):
                 # If we've already extracted this exact file, move on.
                 if fname in [extracted[0] for extracted in self.extracted_images[0]]:
                     print fname,'has already been extracted. Remove from self.extracted_images '+\
-                                'list if you want to run it again.'
+                                'list (by running self.redo_extraction) if you want to try again.'
                     continue
                 self.log.info('Extracting spectrum from {}'.format(fname))
                 # If we've already extracted a spectrum of this object, use it as a reference
@@ -621,7 +621,7 @@ class Shiv(object):
                 # If we've already extracted this exact file, move on.
                 if fname in [extracted[0] for extracted in self.extracted_images[1]]:
                     print fname,'has already been extracted. Remove from self.extracted_images '+\
-                                'list if you want to run it again.'
+                                'list (by running self.redo_extraction) if you want to try again.'
                     continue
                 self.log.info('Extracting spectrum from {}'.format(fname))
                 # If we've already extracted a blue spectrum of this object, use it for reference.
@@ -740,6 +740,8 @@ class Shiv(object):
         side -- String or list of strings; Which sides to re-extract.
                 can be one of 'red', 'blue', or ['red','blue'].
         """
+        if type(side) != list:
+            side = [side]
         if objname == 'all':
             self.extracted_images = [[],[]]
         else:
