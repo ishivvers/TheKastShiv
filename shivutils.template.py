@@ -83,6 +83,10 @@ from pyraf import iraf
 yes=iraf.yes
 no=iraf.no
 INDEF=iraf.INDEF
+# need to initialize a few packages too
+print 'Initializing IRAF packages...'
+iraf.noao()
+iraf.oned()
 
 ############################################################################
 # file system management
@@ -323,6 +327,7 @@ def head_update( images, keywords, values, comment=None ):
             hdu[0].header.set(key, values[i], comment)
         hdu.writeto( image, clobber=True, output_verify='warn' )
         hdu.close()
+        print 'updated header of',image
 
 ############################################################################
 # rotations of red-side CCD
@@ -890,7 +895,7 @@ def clean_cosmics( fitspath, side, cleanpath=None, maskpath=None, plot=False ):
         rdnoise = REDRDNOISE # BELOW RULES OF THUM ARE FROM COSMICS DOCSTRING:
         sigclip = 6.0 # Increase this if you detect cosmics where there are none.
                       #  Default is 5.0, a good value for earth-bound images.
-        sigfrac = 1.0 # Increase this if normal stars are detected as cosmics.
+        sigfrac = 2.0 # Increase this if normal stars are detected as cosmics.
                       #  Default is 5.0, a good value for earth-bound images.
         maxiter = 7   # Max number of iterations.
         objlim = 2.0  # Contrast limit between CR and underlying object
@@ -1197,6 +1202,77 @@ def coadd( files, save=True, fname=None ):
         hdu.data = np.vstack( (fl, er) )
         # save the file
         hdu.writeto( fname, output_verify='warn' )
+    return wl, fl, er
+
+def median_combine( files, fname=None ):
+    """
+    Reads in a list of fits file names (file formats as expected from flux-calibrated
+    spectra, after using the IDL routine cal.pro).
+    Averages the spectra using IRAF's scombine task and
+    sigma-clipping outliers with the intent of reducing the impact of cosmic rays.
+    
+    Returns numpy arrays of wavelength, flux, and error.
+   
+    Arguments:
+    files -- List of strings; paths to input files to coadd.
+    
+    Keyword arguments:
+    fname -- String; Will save output file with this name.
+             If not given, will prepend 'coadded.' to the input file name.
+    """
+    if fname == None:
+        fname = 'combined.'+files[0]
+    # open the files to calculate the total exposure time and get effective obsdate
+    hdus = [pf.open(f) for f in files]
+    totime = sum([float(h[0].header['exptime']) for h in hdus])
+    date_fmt = '%Y-%m-%dT%H:%M:%S.%f'
+    date_fmt2 = '%Y-%m-%dT%H:%M:%S'
+    try:
+        # the date-beg header was changed at some point
+        datebegin = h[0].header['date-beg']
+    except KeyError:
+        datebegin = h[0].header['date-sta']
+    try:
+        obs_begin = min([ datetime.strptime( datebegin, date_fmt ) for h in hdus ])
+    except ValueError:
+        obs_begin = min([ datetime.strptime( datebegin, date_fmt2 ) for h in hdus ])
+    try:
+        obs_end = max([ datetime.strptime( h[0].header['date-end'], date_fmt ) for h in hdus ])
+    except ValueError:
+        obs_end = max([ datetime.strptime( h[0].header['date-end'], date_fmt2 ) for h in hdus ])
+    obs_mid = obs_begin + (obs_end-obs_begin)/2
+
+    # scombine needs a comma-seperated list
+    f = ','.join(files)
+    iraf.scombine( f, fname,
+        combine='average', reject='avsigclip', lsigma=2, hsigma=2, mclip=yes,
+        scale='exposure', weight='exposure' )
+
+    # update the header of the new file
+    keywords = ['exptime',
+                'date-beg',
+                'date-obs',
+                'utmiddle',
+                'date-end']
+    values = [totime,
+              datetime.strftime( obs_begin, date_fmt ),
+              datetime.strftime( obs_begin, date_fmt ),
+              datetime.strftime( obs_mid, date_fmt ),
+              datetime.strftime( obs_end, date_fmt )]
+    head_update( fname, keywords, values, comment=None )
+
+    keywords = ['cadd-frm']
+    values = ','.join(files)
+    head_update( fname, keywords, values, comment=None )
+
+    # pull out and return the co-added values
+    h = pf.open( fname )
+    wl = np.arange( h[0].header['crval1'], 
+                    h[0].header['crval1'] + h[0].data.shape[-1]*h[0].header['cdelt1'],
+                    h[0].header['cdelt1'])
+    fl = h[0].data[0]
+    er = h[0].data[1]
+
     return wl, fl, er
 
 ######################################################################

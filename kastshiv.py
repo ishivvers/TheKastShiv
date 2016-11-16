@@ -2,6 +2,7 @@
 The Kast Shiv: a Kast spectrocscopic reduction pipeline
  written by I.Shivvers (modified from the K.Clubb/J.Silverman/R.Foley/R.Chornock/T.Matheson
  pipeline and the B.Cenko pipeline - thanks everyone).
+
 """
 
 import shivutils as su
@@ -98,7 +99,11 @@ class Shiv(object):
             print '\nChoose one:'
             for i,s in enumerate(self.steps):
                 print i,':::',s.__name__
-            self.current_step = int(raw_input())
+            print 'q ::: quit'
+            try:
+                self.current_step = int(raw_input())
+            except ValueError:
+                return
             self.summary()
         # handle the prefixes properly
         if self.current_step <= self.steps.index( self.trim_and_bias_correct ):
@@ -178,7 +183,8 @@ class Shiv(object):
             print 'End of reduction pipeline.'
             return
         try:
-            print '\nNext step:',self.steps[self.current_step+1].__name__
+            print '\n'
+            print 'Subsequent:',self.steps[self.current_step+1].__name__
             print self.steps[self.current_step+1].__doc__
         except IndexError:
             print 'End of reduction pipeline.'
@@ -451,7 +457,7 @@ class Shiv(object):
                 # If we've already extracted this exact file, move on.
                 if fname in [extracted[0] for extracted in self.extracted_images[0]]:
                     print fname,'has already been extracted. Remove from self.extracted_images '+\
-                                'list if you want to run it again.'
+                                'list (by running self.redo_extraction) if you want to try again.'
                     continue
                 # If we've already extracted a spectrum of this object, use it as a reference
                 irefs = [ i for i in range(len(self.extracted_images[0])) if self.extracted_images[0][i][1]==o[4] ]
@@ -491,7 +497,7 @@ class Shiv(object):
                 # If we've already extracted this exact file, move on.
                 if fname in [extracted[0] for extracted in self.extracted_images[1]]:
                     print fname,'has already been extracted. Remove from self.extracted_images '+\
-                                'list if you want to run it again.'
+                                'list (by running self.redo_extraction) if you want to try again.'
                     continue
                 # If we've already extracted a blue spectrum of this object, use it for reference.
                 #  If we've extracted a red spectrum, use its apfile for reference,
@@ -586,6 +592,36 @@ class Shiv(object):
         if (side == 'blue') and (fname not in [extracted[0] for extracted in self.extracted_images[1]]):
             self.extracted_images[1].append( [fname,o[4]] )
 
+    def redo_extraction(self, objname, side=['red','blue']):
+        """
+        Remove images of the object from self.extracted_images list, so
+        that running self.extract_object_spectra() will re-extract all spectra
+        of that object.
+
+        Arguments:
+        objname -- String; exact object name to re-extract.
+                   If given "all", will forget about all objects.
+
+        Keyword arguments:
+        side -- String or list of strings; Which sides to re-extract.
+                can be one of 'red', 'blue', or ['red','blue'].
+        """
+        if type(side) != list:
+            side = [side]
+        if objname == 'all':
+            self.extracted_images = [[],[]]
+        else:
+            smap = {'red':0,'blue':1}
+            if type(side) != list:
+                side = list(side)
+            for s in side:
+                i = smap[s]
+                newlist = []
+                for row in self.extracted_images[i]:
+                    if row[1] != objname:
+                        newlist.append( row )
+                self.extracted_images[i] = newlist
+
     def splot(self, filename ):
         """
         Use iraf's splot to view a 1d fits file spectrum
@@ -619,20 +655,30 @@ class Shiv(object):
         Go through and identify and fit for the lines in all arc files. Requires
          human interaction.
         """
-        self.log.info("Identifying arc lines and fitting for wavelength solutions")
-        # ID the blue side arc
-        su.run_cmd( 'xdg-open %s'%su.BLUEARCIMG, ignore_errors=True )
-        bluearc = self.apf+self.ebroot%(self.barcs[0][0])
-        su.id_arc( bluearc, side='b' )
-        self.log.info("Successfully ID'd "+bluearc)
+        # ID the blue side arc; define which one we'll use
+        #  to calibrate later on
+        bluearcs = [self.apf+self.broot%o[0] for o in self.barcs]
+        if len(bluearcs) > 1:
+            raise Exception('Found more than one blue arc image!')
+        inn = raw_input('\nView the blue arc lamp reference image? (y/n)[y]\n')
+        if 'n' not in inn.lower():
+            su.run_cmd( 'open %s'%su.BLUEARCIMG, ignore_errors=True )
+        
+        self.bluearc = bluearcs[0]
+        su.id_arc( self.bluearc, side='b' )
+        self.log.info("Successfully ID'd arc lamp lines from "+self.bluearc)
 
         # sum the R1 and R2 red arcs from the beginning of the night and id the result
         su.run_cmd( 'xdg-open %s'%su.REDARCIMG, ignore_errors=True )
         R1R2 = [self.apf+self.erroot%o[0] for o in self.rarcs][:2]
-        su.combine_arcs( R1R2, 'Combined_0.5_Arc.ms.fits' )
-        self.log.info("Created Combined_0.5_Arc.ms.fits from "+str(R1R2))
-        su.id_arc( 'Combined_0.5_Arc.ms.fits', side='r' )
-        self.log.info("Successfully ID'd Combined_0.5_Arc.ms.fits" )
+        su.combine_arcs( R1R2, combined_red_name )
+        self.log.info( "Created {} from {}".format(combined_red_name,R1R2) )
+        inn = raw_input('\nView the red arc lamp reference image? (y/n)[y]\n')
+        if 'n' not in inn.lower():
+            su.run_cmd( 'open %s'%su.REDARCIMG, ignore_errors=True )
+        self.redarc = combined_red_name
+        su.id_arc( self.redarc, side='r' )
+        self.log.info("Successfully ID'd arc lamp lines from "+self.redarc)
 
         # ID the first red object arc interactively, making sure
         #  we handle the 0.5" arcs properly
@@ -725,6 +771,12 @@ class Shiv(object):
          the result as an ASCII (.flm) file.
         If globstr is given, only processes files that include that glob string (example: glob='sn2014ds').
         Requires human interaction.
+
+        Must be run from final folder.
+
+        Keyword arguments:
+        globstr -- String; If given, only processes files that include that
+                   glob string (example: glob='sn2014ds').
         """
         if globstr != '':
             globstr = '*'+globstr
@@ -774,29 +826,7 @@ class Shiv(object):
             # find all the blues, and coadd them
             bluematches = glob( namedate + '*' + 'uv.ms.fits' )
             if len(bluematches) > 1:
-                inn = raw_input( 'Combine the following files: \n'+str(bluematches)+'? [y/n] (y):\n' )
-                if 'n' not in inn:
-                    # need to update the filename to show that it was averaged
-                    # assumes that all were observed on the same day
-                    f_timestr = re.search( '\.\d{3}', fblue ).group()
-                    avg_time = np.mean( [float(re.search('\.\d{3}', fff).group()) for fff in bluematches] )
-                    new_timestr = ('%.3f'%avg_time)[1:] #drop the leading 0
-                    fblue = fblue.replace( f_timestr, new_timestr )
-                    blue = list(su.coadd( bluematches, fname=fblue ))
-                    self.log.info( 'Coadded the following files: '+str(bluematches))
-                else:
-                    print 'Choose which file you want:'
-                    for i,f in enumerate(bluematches): print i,':::',f
-                    inn = raw_input('Enter a number, or q to quit\n')
-                    if 'q' in inn:
-                        continue
-                    else:
-                        try:
-                            fblue = bluematches[int(inn)]
-                            blue = list(su.read_calfits( fblue ))
-                        except ValueError:
-                            print '\nWhat?\n'
-                            continue
+                blue, fblue = self.coadd( files=bluematches )
             elif len(bluematches) == 1:
                 fblue = bluematches[0]
                 blue = list(su.read_calfits( fblue ))
@@ -806,29 +836,7 @@ class Shiv(object):
             # find all the reds, and coadd them
             redmatches = glob( namedate + '*' + 'ir.ms.fits' )
             if len(redmatches) > 1:
-                inn = raw_input( 'Combine the following files: \n'+str(redmatches)+'? [y/n] (y):\n' )
-                if 'n' not in inn:
-                    # need to update the filename to show that it was averaged
-                    # assumes that all were observed on the same day
-                    f_timestr = re.search( '\.\d{3}', fred ).group()
-                    avg_time = np.mean( [float(re.search('\.\d{3}', fff).group()) for fff in redmatches] )
-                    new_timestr = ('%.3f'%avg_time)[1:] #drop the leading 0
-                    fred = fred.replace( f_timestr, new_timestr )
-                    red = list(su.coadd( redmatches, fname=fred ))
-                    self.log.info( 'Coadded the following files: '+str(redmatches))
-                else:
-                    print 'Choose which file you want:'
-                    for i,f in enumerate(redmatches): print i,':::',f
-                    inn = raw_input('Enter a number, or q to quit\n')
-                    if 'q' in inn:
-                        continue
-                    else:
-                        try:
-                            fred = redmatches[int(inn)]
-                            red = list(su.read_calfits( fred ))
-                        except ValueError:
-                            print '\nWhat?\n'
-                            continue
+                red, fred = self.coadd( files=redmatches )
             elif len(redmatches) == 1:
                 fred = redmatches[0] 
                 red = list(su.read_calfits( fred ))
@@ -854,25 +862,36 @@ class Shiv(object):
             # only drop from the list if we got all the way through and successfully saved it
             allfiles = [f for f in allfiles if namedate not in f]
 
+    ################################################
+    # helper functions 
+    ################################################
     def coadd(self, files=None, globstr=None):
         """
-        Coadd a set of files.  If given globstr, will coadd all files
-         that match it.  If given files (a list), will coadd those files.
-         Only accepts fits files as an argument.
+        Coadd a set of files with median outlier
+        rejection, as in the pipeline.
+
+        Keyword arguments:
+        files -- List; if given, will coadd those files.
+        globstr -- String; if given, and files is not,
+                   will coadd all files with filenames
+                   that match the string.
         """
-        if 'globstr' != None:
+        if (files == None) and (globstr != None):
             files = glob('*'+globstr+'*')
         
         inn = raw_input('\n Co-add the following files? \n'+str(files)+\
                          '\n [y/n] (y):\n')
         if 'n' not in inn.lower():
+            # need to update the filename to show that it was averaged
+            # assumes that all were observed on the same day
             f_timestr = re.search( '\.\d{3}', files[0] ).group()
             avg_time = np.mean( [float(re.search('\.\d{3}', fff).group()) for fff in files] )
             new_timestr = ('%.3f'%avg_time)[1:] #drop the leading 0
+            new_timestr = new_timestr + '.coadd'
             fname = files[0].replace( f_timestr, new_timestr )
-            wl,fl,er = su.coadd( files, fname=fname )
+            coadded = list( su.median_combine( files, fname=fname ) )
             self.log.info( 'Co-addition of %s saved to file %s'%(str(files), fname) )
-            return wl,fl,er
+            return coadded, fname
 
     def join(self, files=None, globstr=None, ftype='fits', outf=None):
         """
