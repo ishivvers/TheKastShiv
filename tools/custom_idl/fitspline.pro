@@ -13,18 +13,18 @@ pro fitspline, wave, spectrum, airmass, splineresult, airlimit, col
 ;----------------------------------------------------------------------
 ; sets up calls for color in all plots
 
-; col = {black: 0L, red: 1L, green: 2L, blue: 3L, $
-;        aqua: 4L, violet: 5L, yellow: 6L, white: 7L}
+ col = {black: 0L, red: 1L, green: 2L, blue: 3L, $
+        aqua: 4L, violet: 5L, yellow: 6L, white: 7L}
 ;          b  r  g  b  a  v  y  w
 ;          l  e  r  l  q  i  e  h
 ;          a  d  e  u  u  o  l  i
 ;          c     e  e  a  l  l  t
 ;          k     n        e  o  e
 ;                         t  w
-; rtiny  =  [0, 1, 0, 0, 0, 1, 1, 1]
-; gtiny  =  [0, 0, 1, 0, 1, 0, 1, 1]
-; btiny  =  [0, 0, 0, 1, 1, 1, 0, 1]
-; tvlct, 255*rtiny, 255*gtiny, 255*btiny
+ rtiny  =  [0, 1, 0, 0, 0, 1, 1, 1]
+ gtiny  =  [0, 0, 1, 0, 1, 0, 1, 1]
+ btiny  =  [0, 0, 0, 1, 1, 1, 0, 1]
+ tvlct, 255*rtiny, 255*gtiny, 255*btiny
 
 ;loadct, 2
 ;  NOTE: color is now passed to fitspline from mkfluxstar and mkbstar

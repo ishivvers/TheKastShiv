@@ -23,20 +23,20 @@ pro realmkbstar, infile, gratcode, intera
 ;------------------------------------------------------------------------
 ; sets up calls for color in all plots
 
-   col = {black: 0L, red: 255L, green: 65280L, blue: 16711680L, $
-          aqua: 16776960L, violet: 16711935L, yellow: 65535L, white: 16777215L}
-;  col = {black: 0L, red: 1L, green: 2L, blue: 3L, $
-;         aqua: 4L, violet: 5L, yellow: 6L, white: 7L}
+;   col = {black: 0L, red: 255L, green: 65280L, blue: 16711680L, $
+;          aqua: 16776960L, violet: 16711935L, yellow: 65535L, white: 16777215L}
+  col = {black: 0L, red: 1L, green: 2L, blue: 3L, $
+         aqua: 4L, violet: 5L, yellow: 6L, white: 7L}
 ;            b  r  g  b  a  v  y  w
 ;            l  e  r  l  q  i  e  h
 ;            a  d  e  u  u  o  l  i
 ;            c     e  e  a  l  l  t
 ;            k     n        e  o  e
 ;                           t  w
-;  rtiny  =  [0, 1, 0, 0, 0, 1, 1, 1]
-;  gtiny  =  [0, 0, 1, 0, 1, 0, 1, 1]
-;  btiny  =  [0, 0, 0, 1, 1, 1, 0, 1]
-;  tvlct, 255*rtiny, 255*gtiny, 255*btiny
+  rtiny  =  [0, 1, 0, 0, 0, 1, 1, 1]
+  gtiny  =  [0, 0, 1, 0, 1, 0, 1, 1]
+  btiny  =  [0, 0, 0, 1, 1, 1, 0, 1]
+  tvlct, 255*rtiny, 255*gtiny, 255*btiny
 ;  Ordered Triple to long number: COLOR = R + 256 * (G + 256 * B)
 
 ;loadct, 2

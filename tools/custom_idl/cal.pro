@@ -45,9 +45,9 @@ repeat begin
     print, intera
 endrep until (intera EQ 'n') or (intera EQ 'y')
 print, ' '
-print, 'We now need a grating code, such as opt or ir2.'
+print, 'We now need a grating code, such as uv or ir.'
 print, 'This will be used to keep track of the fluxstar and'
-print, 'bstar as in fluxstaropt.fits or bstarir2.fits'
+print, 'bstar as in fluxstaruv.fits or bstarir.fits'
 print, ' '
 read, 'Enter the grating code: ', gratcode
 print, ' '
