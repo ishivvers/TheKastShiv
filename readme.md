@@ -1,6 +1,6 @@
 ## The Kast Shiv ##
 
-This is the I.Shivvers version of the
+This is the Shivvers version of the
 Flipper group's Kast/Shane reduction pipeline.
 
 This version of the code is designed to be used on data obtained
