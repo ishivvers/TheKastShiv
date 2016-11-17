@@ -1087,8 +1087,9 @@ def calibrate_idl( input_dict, idlpath=IDLPATH ):
         # give the user some feedback
         print '\n\nStarting IDL & cal.pro'
         print 'Standard file:',std
+        print 'Associated files:',input_dict[std],'\n'
         print 'Input file: cal.input'
-        print 'Type "cal"\n'
+        print 'Type "cal" to start.\n'
         
         while True:
             start_idl()
