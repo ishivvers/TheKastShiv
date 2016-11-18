@@ -895,7 +895,7 @@ def clean_cosmics( fitspath, side, cleanpath=None, maskpath=None, plot=False ):
         rdnoise = REDRDNOISE # BELOW RULES OF THUM ARE FROM COSMICS DOCSTRING:
         sigclip = 6.0 # Increase this if you detect cosmics where there are none.
                       #  Default is 5.0, a good value for earth-bound images.
-        sigfrac = 2.0 # Increase this if normal stars are detected as cosmics.
+        sigfrac = 3.0 # Increase this if normal stars are detected as cosmics.
                       #  Default is 5.0, a good value for earth-bound images.
         maxiter = 7   # Max number of iterations.
         objlim = 2.0  # Contrast limit between CR and underlying object
