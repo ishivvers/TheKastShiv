@@ -938,9 +938,11 @@ class Shiv(object):
             for i,f in enumerate(allfiles):
                 if 'uv' in f:
                     print i,':::',f
-            inn = raw_input('\n Choose the number of a spectrum to coadd/join, or q to quit\n')
-            if 'q' in inn.lower():
+            inn = raw_input('\n Choose the number of a spectrum to coadd/join, d to be done, or q to quit\n')
+            if 'd' in inn.lower():
                 break
+            elif 'q' in inn.lower():
+                raise Exception('No problem, just quitting!')
             else:
                 try:
                     which = int(inn)
