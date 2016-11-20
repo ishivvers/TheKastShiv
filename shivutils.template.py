@@ -1005,9 +1005,10 @@ def match_science_and_standards( allobjects ):
             continue
         
         std_names.append( fname )
-        airmasses.append( head_get( fname, 'AIRMASS' )[0] )
+        am = head_get( fname, 'AIRMASS' )[0]
+        airmasses.append( am )
         if (std_id[1] == 1):
-            blue_outdict[ fname ] = [] 
+            blue_outdict[ fname ] = [ [fname, objname, am] ]
         else:
             raise StandardError( "attempting to use a standard on the wrong side!" )
     
@@ -1022,7 +1023,7 @@ def match_science_and_standards( allobjects ):
             continue
         am = head_get( fname, 'AIRMASS' )[0]
         std_match = std_names[ np.argmin(np.abs(am-airmasses)) ]
-        blue_outdict[ std_match ].append( fname )
+        blue_outdict[ std_match ].append( [fname, objname, am] )
  
     # now get all of the red standards
     airmasses = []
@@ -1036,9 +1037,10 @@ def match_science_and_standards( allobjects ):
             continue
         
         std_names.append( fname )
-        airmasses.append( head_get( fname, 'AIRMASS' )[0] )
+        am = head_get( fname, 'AIRMASS' )[0]
+        airmasses.append( am )
         if (std_id[1] == 2):
-            red_outdict[ fname ] = []
+            red_outdict[ fname ] = [ [fname, objname, am] ]
         else:
             raise StandardError( "attempting to use a standard on the wrong side!" )
     
@@ -1053,7 +1055,7 @@ def match_science_and_standards( allobjects ):
             continue
         am = head_get( fname, 'AIRMASS' )[0]
         std_match = std_names[ np.argmin(np.abs(am-airmasses)) ]
-        red_outdict[ std_match ].append( fname )
+        red_outdict[ std_match ].append( [fname, objname, am] )
                
     return blue_outdict, red_outdict
 
@@ -1079,9 +1081,9 @@ def calibrate_idl( input_dict, idlpath=IDLPATH ):
     for std in input_dict.keys():
         # create an input file
         ftmp = open('cal.input','w')
-        ftmp.write( '%s\n'%std )
+        # ftmp.write( '%s\n'%std )
         for val in input_dict[std]:
-            ftmp.write( '%s\n'%val )
+            ftmp.write( '%s\n'%val[0] )
         ftmp.close()
         
         # give the user some feedback

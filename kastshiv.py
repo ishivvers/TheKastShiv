@@ -68,6 +68,7 @@ class Shiv(object):
                       self.extract_arc_spectra,
                       self.id_arcs,
                       self.apply_wavelength,
+                      self.choose_flux_standards,
                       self.flux_calibrate,
                       self.coadd_join_output]
         self.current_step = 0
@@ -853,6 +854,32 @@ class Shiv(object):
 
         self.opf = 'dftcb' # d for dispersion-corrected
 
+    def choose_flux_standards(self, side=None):
+        """
+        Determine which standard observed to use for each
+        science observation (interactive).
+
+        Keyword arguments:
+        side -- String; side to flux calibrate. Can be one of 'red', 'blue', or None to do both sides.
+                If not given, calibrates both sides, starting with blue.
+        """
+        # match objects to standards take at the closest airmass
+        blues = [self.opf+self.ebroot%o[0] for o in self.bobjects]
+        reds = [self.opf+self.erroot%o[0] for o in self.robjects]
+        if side == 'red':
+            objects = reds
+        elif side == 'blue':
+            objects = blues
+        elif side == None:
+            objects = blues + reds
+        else:
+            raise Exception('I do not understand!')
+
+        blue_std_dict, red_std_dict = su.match_science_and_standards( objects )
+        self.blue_std_dict = blue_std_dict
+        self.red_std_dict = red_std_dict
+
+
     def flux_calibrate(self, side=None):
         """
         Determine and apply the relevant flux calibration to all objects.
@@ -861,41 +888,45 @@ class Shiv(object):
         in the final directory.
 
         Keyword arguments:
-        side -- String; side to flux calibrate. Can be one of 'red', 'blue'.
+        side -- String; side to flux calibrate. Can be one of 'red', 'blue', or None to do both sides.
                 If not given, calibrates both sides, starting with blue.
         """
         # keep track of the files we create here, and move them to ../final
         starting_files = glob('*.fits')
         self.log.info("Flux calibrating all objects")
-        # match objects to standards take at the closest airmass
-        allobjects = [self.opf+self.ebroot%o[0] for o in self.bobjects] +\
-                     [self.opf+self.erroot%o[0] for o in self.robjects]
-        blue_std_dict, red_std_dict = su.match_science_and_standards( allobjects )
-
-        # don't bother calibrating any standards that will not be used
-        for k in blue_std_dict.keys():
-            if len(blue_std_dict[k]) == 0:
-                blue_std_dict.pop(k)
-        for k in red_std_dict.keys():
-            if len(red_std_dict[k]) == 0:
-                red_std_dict.pop(k)
-
-        tmp = blue_std_dict.copy()
-        tmp.update(red_std_dict)
-        for k in tmp.keys():
-            self.log.info( "\nAssociated the following files with standard "+k+":\n"+',\n'.join(tmp[k]) )
 
         # apply flux calibrations
         if side in ['blue',None]:
+            blue_std_dict = self.blue_std_dict
+            # don't bother calibrating any standards that will not be used
+            for k in blue_std_dict.keys():
+                if len(blue_std_dict[k]) == 0:
+                    blue_std_dict.pop(k)
+
             su.calibrate_idl( blue_std_dict )
-            self.log.info( "Applied flux calibrations to blue objects" )
+            for k in blue_std_dict.keys():
+                logstr = "Applied blue flux calibrations from {} ({}) to following:\n".format( *blue_std_dict[k][0][:2] )
+                for f in blue_std_dict[k][1:]:
+                    logstr += ' {} ({})\n'.format( *f[:2] )
+                self.log.info ( logstr )
+
         if side in ['red',None]:
+            red_std_dict = self.red_std_dict
+            # don't bother calibrating any standards that will not be used
+            for k in red_std_dict.keys():
+                if len(red_std_dict[k]) == 0:
+                    red_std_dict.pop(k)
+
             su.calibrate_idl( red_std_dict )
-            self.log.info( "Applied flux calibrations to red objects" )
+            for k in red_std_dict.keys():
+                logstr = "Applied red flux calibrations from {} ({}) to following:\n".format( *red_std_dict[k][0][:2] )
+                for f in red_std_dict[k][1:]:
+                    logstr += ' {} ({})\n'.format( *f[:2] )
+                self.log.info ( logstr )
 
         ending_files = glob('*.fits')
         for f in ending_files:
-            if (f not in starting_files) and (f[:5] != 'cdcfb'):
+            if (f not in starting_files) and (f[:3] != 'cdf'):
                 su.run_cmd(' mv %s ../final/.' %f )
         print 'Moving to final directory.'
         os.chdir( '../final' )
