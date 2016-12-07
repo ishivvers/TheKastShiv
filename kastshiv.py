@@ -373,17 +373,19 @@ class Shiv(object):
             if not pagename:
                 date = date_parser.parse(datestring)
                 pagename = "%d_%.2d_kast_%s" %(date.month, date.day, self.runID)
-            self.objects, self.arcs, self.flats = su.wiki2elog( datestring=dateUT, runID=self.runID, outfile='%s.log'%self.runID, pagename=pagename  )
             obslog = '%s.log'%self.runID
+            self.objects, self.arcs, self.flats = su.wiki2elog( datestring=dateUT, runID=self.runID, outfile=obslog, pagename=pagename  )
+            self.obslog = obslog
             su.populate_working_dir( self.runID, logfile=obslog )
         elif obslog != None:
             self.objects, self.arcs, self.flats = su.wiki2elog( datestring=dateUT, runID=self.runID, infile=obslog )
             su.populate_working_dir( self.runID, logfile=obslog )
+            self.obslog = obslog
         else:
             raise StandardError( 'Improper arguments! Need one of obslog or dateUT' )
-        self.log.info( 'Moved data into working directory; using obslog=%s'%obslog )
+        self.log.info( 'Moved data into working directory; using obslog=%s'%self.obslog )
 
-    def define_lists(self, obslog=None):
+    def define_lists(self, obslog=self.obslog):
         """
         Parses the output of wiki2elog into the formats needed here.
 
