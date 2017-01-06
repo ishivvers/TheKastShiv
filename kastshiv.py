@@ -384,8 +384,8 @@ class Shiv(object):
         else:
             raise StandardError( 'Improper arguments! Need one of obslog or dateUT' )
         self.log.info( 'Moved data into working directory; using obslog=%s'%self.obslog )
-
-    def define_lists(self, obslog=self.obslog):
+    
+    def define_lists(self, obslog=None):
         """
         Parses the output of wiki2elog into the formats needed here.
 
@@ -393,6 +393,9 @@ class Shiv(object):
         obslog -- String; if given a obslog path, will use that obslog to build the lists,
                   overriding anything previously given.
         """
+        if obslog == None:
+            obslog = self.obslog
+        
         # define the file lists
         self.build_lists( obslog=obslog )
 
