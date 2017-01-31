@@ -31,8 +31,8 @@ class Shiv(object):
      pipeline and the B.Cenko pipeline - thanks everyone).
     """
     
-    def __init__(self, runID, interactive=False, savefile=None, logfile=None,
-                 datePT=None, dateUT=None, inlog=None, pagename=None, parallel=False):
+    def __init__(self, runID, interactive=True, savefile=None, logfile=None,
+                 datePT=None, dateUT=None, inlog=None, pagename=None, parallel=True):
         self.runID = runID
         self.interactive = interactive
         self.datePT = datePT
@@ -203,6 +203,29 @@ class Shiv(object):
         sh.setFormatter( logging.Formatter('*'*40+'\n%(levelname)s - %(message)s\n'+'*'*40) )
         self.log.addHandler(sh)
         self.log.info('Shiv Reducer started.')
+        print '          @@@@@@@@'
+        print '           //////'
+        print '           //////'
+        print '           //////'
+        print '           //////'
+        print '           //////'
+        print '       ____//////____'
+        print '      |______________|'
+        print '          /      /'
+        print '         /      /'
+        print '         \\      \\'
+        print '          \\      \\'
+        print '          / THE  /'
+        print '         / KAST /'
+        print '         \\ SHIV \\'
+        print '          \\      \\'
+        print '          /      /'
+        print '         /      /'
+        print '         \\      \\'
+        print '          \\     /'
+        print '           \\   /'
+        print '            \\ /'
+        print '             V'
 
     def summary(self):
         """ Print a summary of the current state of the reduction. """
