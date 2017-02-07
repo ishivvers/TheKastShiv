@@ -1069,8 +1069,10 @@ class Shiv(object):
                 output_name = fred.replace('ir','ui').replace('.ms.fits','.flm')
             elif self.side == 'red':
                 wl, fl, er = red
+                output_name = fred.replace('.ms.fits','.flm')
             elif self.side == 'blue':
                 wl, fl, er = blue
+                output_name = fblue.replace('.ms.fits','.flm')
             
             # should we save the result?
             su.plot_spectra( wl,fl,er, title=namedate )

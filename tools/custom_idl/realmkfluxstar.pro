@@ -14,10 +14,10 @@ pro realmkfluxstar, infile, gratcode, intera
 ;------------------------------------------------------------------------
 ; sets up calls for color in all plots
 
-;   col = {black: 0L, red: 255L, green: 65280L, blue: 16711680L, $
-;          aqua: 16776960L, violet: 16711935L, yellow: 65535L, white: 16777215L}
-  col = {black: 0L, red: 1L, green: 2L, blue: 3L, $
-         aqua: 4L, violet: 5L, yellow: 6L, white:7L}
+   col = {black: 0L, red: 255L, green: 65280L, blue: 16711680L, $
+          aqua: 16776960L, violet: 16711935L, yellow: 65535L, white: 16777215L}
+;;;  col = {black: 0L, red: 1L, green: 2L, blue: 3L, $
+;;;         aqua: 4L, violet: 5L, yellow: 6L, white:7L}
 ;            b  r  g  b  a  v  y  w
 ;            l  e  r  l  q  i  e  h
 ;            a  d  e  u  u  o  l  i
