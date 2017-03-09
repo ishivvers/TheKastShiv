@@ -478,21 +478,26 @@ class Shiv(object):
         
         self.opf = 'cb'  # c for cosmic-ray removal
 
-    def rotate_red(self, angle=1.0):
+    def rotate_red(self, angle=0.0):
         """
         Rotates the red CCD to correct tilted slit orientation, and
         then tranposes the x,y axes to get it aligned as normal (blue to the left).
 
         Keyword arguments:
         angle -- Float; degrees by which to rotate the image CCW.
+                 Red-side images observed between September 2016 and January 2017
+                  likely need to be rotated by angle=1.0.
         """
+        self.rangle = angle
+
         if self.side in ['red','both']:
             reds = [self.opf+self.rroot%o[0] for o in self.robjects] +\
                    [self.apf+self.rroot%o[0] for o in self.rarcs] +\
                    [self.fpf+self.rroot%o[0] for o in self.rflats]
-            
-            su.rotate( reds, angle )
-            self.log.info('Rotated following images by {}: {}'.format(angle, ','.join(reds)))
+
+            if self.rangle != 0.0:            
+                su.rotate( reds, self.rangle )
+                self.log.info('Rotated following images by {}: {}'.format(self.rangle, ','.join(reds)))
             
             su.transpose( reds )
             self.log.info('Transposed X,Y for following images: {}'.format(','.join(reds)) )
@@ -539,6 +544,7 @@ class Shiv(object):
         Inserts the airmass and optimal PA into the headers for
         each image, along with some other header fixes.
         """
+        # update the headers with the old kastfixhead.cl code
         if self.side in ['blue','both']:
             blues = [self.opf+self.broot%o[0] for o in self.bobjects] +\
                     [self.apf+self.broot%o[0] for o in self.barcs] +\
@@ -549,6 +555,7 @@ class Shiv(object):
                    [self.apf+self.rroot%o[0] for o in self.rarcs] +\
                    [self.fpf+self.rroot%o[0] for o in self.rflats]
             su.update_headers( reds, reducer=su.REDUCER )
+
         self.log.info('Updated headers of all images')
 
     def make_flats(self, bflat='bflat', rflat='rflat'):
@@ -567,7 +574,17 @@ class Shiv(object):
 
         if self.side in ['red','both']:
             reds = [self.fpf+self.rroot%o[0] for o in self.rflats]
+
+            # I don't know why, but as of March 2017 it seems like the dispersion
+            #  axis here needs to be changed just for making flats. Maybe a problem?
+            if self.rangle == 0.0:
+                self.log.info( '\nTemporarily setting the dispersion axis of the flats to 2.')
+                su.head_update( reds, "DISPAXIS", 2 )
             su.make_flat( reds, rflat, 'red', interactive=self.interactive )
+            # undoing the above hack
+            if self.rangle == 0.0:
+                su.head_update( reds, "DISPAXIS", 1 )
+
             self.rflat = rflat
             self.log.info( '\nCreated flat image {}.fits out of the following files: {}'.format(rflat, ','.join(reds)) )
 
