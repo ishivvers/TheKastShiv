@@ -31,7 +31,7 @@ class Shiv(object):
      pipeline and the B.Cenko pipeline - thanks everyone).
     """
     
-    def __init__(self, runID, interactive=False, savefile=None, logfile=None, side='both',
+    def __init__(self, runID, interactive=True, savefile=None, logfile=None, side='both',
                  datePT=None, dateUT=None, inlog=None, pagename=None, parallel=False):
         self.runID = runID
         self.interactive = interactive
@@ -478,21 +478,26 @@ class Shiv(object):
         
         self.opf = 'cb'  # c for cosmic-ray removal
 
-    def rotate_red(self, angle=1.0):
+    def rotate_red(self, angle=0.0):
         """
         Rotates the red CCD to correct tilted slit orientation, and
         then tranposes the x,y axes to get it aligned as normal (blue to the left).
 
         Keyword arguments:
         angle -- Float; degrees by which to rotate the image CCW.
+        Red-side images observed between September 2016 and January 2017
+        likely need to be rotated by angle=1.0.
         """
+        self.rangle = angle
+        
         if self.side in ['red','both']:
             reds = [self.opf+self.rroot%o[0] for o in self.robjects] +\
                    [self.apf+self.rroot%o[0] for o in self.rarcs] +\
                    [self.fpf+self.rroot%o[0] for o in self.rflats]
             
-            su.rotate( reds, angle )
-            self.log.info('Rotated following images by {}: {}'.format(angle, ','.join(reds)))
+            if self.rangle != 0.0:            
+                su.rotate( reds, self.rangle )
+                self.log.info('Rotated following images by {}: {}'.format(self.rangle, ','.join(reds)))
             
             su.transpose( reds )
             self.log.info('Transposed X,Y for following images: {}'.format(','.join(reds)) )
@@ -510,7 +515,7 @@ class Shiv(object):
             self.log.info( '\nBlue trim section: (%.4f, %.4f)'%(self.b_ytrim[0], self.b_ytrim[1]) )
         if self.side in ['red','both']:
             self.r_ytrim = su.find_trim_sec( self.apf+self.rroot%self.rflats[0][0], plot=self.interactive )
-            self.log.info( '\nRed trim section: (%.4f, %.4f)'%(self.r_ytrim[0], self.r_ytrim[0]) )
+            self.log.info( '\nRed trim section: (%.4f, %.4f)'%(self.r_ytrim[0], self.r_ytrim[1]) )
 
     def trim(self):
         """
@@ -539,6 +544,7 @@ class Shiv(object):
         Inserts the airmass and optimal PA into the headers for
         each image, along with some other header fixes.
         """
+        # update the headers with the old kastfixhead.cl code
         if self.side in ['blue','both']:
             blues = [self.opf+self.broot%o[0] for o in self.bobjects] +\
                     [self.apf+self.broot%o[0] for o in self.barcs] +\
@@ -549,6 +555,7 @@ class Shiv(object):
                    [self.apf+self.rroot%o[0] for o in self.rarcs] +\
                    [self.fpf+self.rroot%o[0] for o in self.rflats]
             su.update_headers( reds, reducer=su.REDUCER )
+
         self.log.info('Updated headers of all images')
 
     def make_flats(self, bflat='bflat', rflat='rflat'):
@@ -567,7 +574,7 @@ class Shiv(object):
 
         if self.side in ['red','both']:
             reds = [self.fpf+self.rroot%o[0] for o in self.rflats]
-            su.make_flat( reds, rflat, 'red', interactive=self.interactive )
+            su.make_flat( reds, rflat, 'red', rangle = self.rangle, interactive=self.interactive )
             self.rflat = rflat
             self.log.info( '\nCreated flat image {}.fits out of the following files: {}'.format(rflat, ','.join(reds)) )
 

@@ -6,6 +6,7 @@ procedure optpa (images)
 #
 #  Authored: long time ago (Silverman, Foley, Matheson, ?)
 #  Modified: 2014 (Shivvers)
+#  Bug Fix:  2017 (tgbrink) ha=ha+haadj ----> ha=ha-haadj
 #
 
 string images {prompt="Image(s) to be fixed"}
@@ -57,8 +58,8 @@ begin
 	    imgets(img,"EXPTIME")
 	    exptime=real(imgets.value)
 	    haadj=(exptime/3600.0/2.0)*15.0*pi/180.0
-	    ha=ha+haadj
-	
+	    ha=ha-haadj
+	    
         factor=(sin(lat)*sin(dec)+cos(lat)*cos(dec)*cos(ha))
 	    sineta = sin(ha)*cos(lat)/sqrt((1.-factor*factor))
 	
