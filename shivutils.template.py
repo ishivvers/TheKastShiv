@@ -444,6 +444,7 @@ def make_flat(images, outflat, side, interactive=True):
     side -- String; must be one of "red" or "blue".`
     """
     if side == 'red':
+        name = 'CombinedFlatRed.fits'
         gain = REDGAIN
         rdnoise = REDRDNOISE
         fitorder = 30
@@ -451,6 +452,7 @@ def make_flat(images, outflat, side, interactive=True):
         high_reject = 0.0 
         niterate = 3
     elif side == 'blue':
+        name = 'CombinedFlatBlue.fits'
         gain = BLUEGAIN1
         rdnoise = BLUERDNOISE
         fitorder = 6
@@ -468,16 +470,24 @@ def make_flat(images, outflat, side, interactive=True):
     flatimages=','.join(images)
     # combine the flats
     try:
-        run_cmd( 'rm CombinedFlat.fits' )
+        run_cmd( 'rm ' + name )
         sleep(1)  # have to wait a bit for this to go through!
     except:
         pass
-    iraf.flatcombine(flatimages, output='CombinedFlat', combine='median',
+    iraf.flatcombine(flatimages, output=name, combine='median',
                      reject='ccdclip', ccdtype='', process=no, subsets=no,
                      delete=no, scale='median', lsigma=3, hsigma=3,
                      gain=gain, rdnoise=rdnoise)
+    
+    # After installation of the new red camera (9/2016) the dispersion direction was rotated 90 deg.
+    # The IRAF RESPONSE task requires DISPAXIS to now be set to '2' (i.e. vertical) for red side flats.
+    # However, if a non-zero rotation is applied to the red side (ex. the 1 deg rotation applied from
+    # 10/2016 - 1/2017, before the misalignment was fixed) IRAF requires DISPAXIS to be '1'.
+    if side == 'red' and rangle == 0.0:
+        head_update( name, 'DISPAXIS', 2, comment=None )
+        
     # fit for the response function and save as the output
-    iraf.response('CombinedFlat', 'CombinedFlat', outflat,
+    iraf.response( name, name, outflat,
                    low_reject=low_reject, high_reject=high_reject, niterate=niterate,
                    order=fitorder, interactive=interact)
 
