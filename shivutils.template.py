@@ -447,15 +447,15 @@ def make_flat(images, outflat, side, interactive=True):
         name = 'CombinedFlatRed.fits'
         gain = REDGAIN
         rdnoise = REDRDNOISE
-        fitorder = 30
-        low_reject = 3.0
+        fitorder = 12
+        low_reject = 2.0
         high_reject = 0.0 
         niterate = 3
     elif side == 'blue':
         name = 'CombinedFlatBlue.fits'
         gain = BLUEGAIN1
         rdnoise = BLUERDNOISE
-        fitorder = 6
+        fitorder = 12
         low_reject = 0.0
         high_reject = 0.0
         niterate = 0
@@ -798,7 +798,7 @@ def extract( image, side, arc=False, interact=True, reference=None, trace_only=F
                  'avglimits':no,
                  't_nsum':100,                 # tracing parameters
                  't_step':20,
-                 't_nlost':3,
+                 't_nlost':10,
                  't_function':'legendre',
                  't_order':4,
                  't_sample':'*',
@@ -1494,6 +1494,7 @@ def plot_spectra(lam, flam, err=None, title=None, savefile=None):
     
     plt.xlabel('Wavelength')
     plt.ylabel('Flux')
+    ax.minorticks_on()
 
     if savefile != None:
         plt.savefig( savefile )
