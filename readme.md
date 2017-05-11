@@ -41,7 +41,7 @@ The setup.py code inserts appropriate paths into files where needed.
 You should place the code into its permanent home and then run this script.
 The script must be run every time the code is moved.
 
-    # from KastShiv root folder
+    # from inside the KastShiv root folder:
     python setup.py
 
 
